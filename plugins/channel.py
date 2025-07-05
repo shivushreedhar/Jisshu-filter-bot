@@ -1,4 +1,4 @@
-# --| This code created by: Jisshu_bots & SilentXBotz |--#
+2# --| This code created by: Jisshu_bots & SilentXBotz |--#
 import re
 import hashlib
 import asyncio
@@ -50,7 +50,7 @@ UPDATE_CAPTION = """<b>𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</b>
 
 {}
 
-<blockquote>〽️ Powered by @Jisshu_bots</b></blockquote>"""
+<blockquote>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
 QUALITY_CAPTION = """📦 {} : {}\n"""
 
