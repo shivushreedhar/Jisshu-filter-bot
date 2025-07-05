@@ -70,22 +70,22 @@ MOVIE_GROUP_LINK = environ.get("MOVIE_GROUP_LINK", "BSHEGDEMOVIE")
 # Verification
 IS_VERIFY = is_enabled("IS_VERIFY", True)
 # ---------------------------------------------------------------
-TUTORIAL = environ.get("TUTORIAL", "https://t.me/")
-TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/")
-TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/")
+TUTORIAL = environ.get("TUTORIAL", "https://t.me/bshowtodownload/20")
+TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/bshowtodownload/20")
+TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/bshowtodownload/20")
 VERIFY_IMG = environ.get(
     "VERIFY_IMG", "https://graph.org/file/1669ab9af68eaa62c3ca4.jpg"
 )
-SHORTENER_API = environ.get("SHORTENER_API", "")
-SHORTENER_WEBSITE = environ.get("SHORTENER_WEBSITE", "")
+SHORTENER_API = environ.get("SHORTENER_API", "seturl.in")
+SHORTENER_WEBSITE = environ.get("SHORTENER_WEBSITE", "407cf41fa5b0bcc37701f80b27acfb28b94054d0")
 SHORTENER_API2 = environ.get(
-    "SHORTENER_API2", ""
+    "SHORTENER_API2", "407cf41fa5b0bcc37701f80b27acfb28b94054d0"
 )
-SHORTENER_WEBSITE2 = environ.get("SHORTENER_WEBSITE2", "")
+SHORTENER_WEBSITE2 = environ.get("SHORTENER_WEBSITE2", "seturl.in")
 SHORTENER_API3 = environ.get(
-    "SHORTENER_API3", ""
+    "SHORTENER_API3", "407cf41fa5b0bcc37701f80b27acfb28b94054d0"
 )
-SHORTENER_WEBSITE3 = environ.get("SHORTENER_WEBSITE3", "")
+SHORTENER_WEBSITE3 = environ.get("SHORTENER_WEBSITE3", "seturl.in")
 TWO_VERIFY_GAP = int(environ.get("TWO_VERIFY_GAP", "14400"))
 THREE_VERIFY_GAP = int(environ.get("THREE_VERIFY_GAP", "14400"))
 
