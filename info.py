@@ -130,16 +130,16 @@ SEASONS = [f"season {i}" for i in range(1, 23)]
 START_IMG = (
     environ.get(
         "START_IMG",
-        "https://i.ibb.co/qpxpGmC/image.jpg https://i.ibb.co/DQ35zLZ/image.jpg",
+        "https://telegra.ph/file/054c51d89929c773caeb3.jpg",
     )
 ).split()
-FORCESUB_IMG = environ.get("FORCESUB_IMG", "https://i.ibb.co/ZNC1Hnb/ad3f2c88a8f2.jpg")
-REFER_PICS = (environ.get("REFER_PICS", "https://envs.sh/PSI.jpg")).split()
+FORCESUB_IMG = environ.get("FORCESUB_IMG", "https://telegra.ph/file/054c51d89929c773caeb3.jpg")
+REFER_PICS = (environ.get("REFER_PICS", "https://telegra.ph/file/054c51d89929c773caeb3.jpg")).split()
 PAYPICS = (
-    environ.get("PAYPICS", "https://graph.org/file/f4db1c3ad3d9e38b328e6.jpg")
+    environ.get("PAYPICS", "https://telegra.ph/file/054c51d89929c773caeb3.jpg")
 ).split()
 SUBSCRIPTION = environ.get(
-    "SUBSCRIPTION", "https://graph.org/file/9f3f47c690bbcc67633c2.jpg"
+    "SUBSCRIPTION", "https://telegra.ph/file/054c51d89929c773caeb3.jpg"
 )
 REACTIONS = ["👀", "😱", "🔥", "😍", "🎉", "🥰", "😇", "⚡"]
 
