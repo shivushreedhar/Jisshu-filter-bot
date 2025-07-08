@@ -7,6 +7,7 @@ from utils import *
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
 
+OWNER_ID = 5536032493
 CAPTION_LANGUAGES = [
     "Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu",
     "Malayalam", "Kannada", "Marathi", "Punjabi", "Bengoli", "Gujrati",
@@ -36,7 +37,6 @@ async def media(bot, message):
     try:
         print(f"📥 File received in DB channel: {message.chat.id}")
         media = getattr(message, message.media.value, None)
-
         if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
             media.file_type = message.media.value
             media.caption = message.caption
@@ -96,10 +96,9 @@ async def queue_movie_file(bot, media):
 
 async def schedule_movie_post(bot, file_name, files):
     try:
-        OWNER_ID = OWNER_IDS[0] if isinstance(OWNER_IDS, list) else OWNER_IDS
-        ask = await bot.ask(OWNER_ID, f"Do you want to schedule the post for '{file_name}'? (yes/no)", timeout=180)
+        ask = await bot.ask(OWNER_ID, f"🎬 <b>{file_name}</b>\nDo you want to schedule the post? (yes/no)", timeout=180)
         if ask.text.strip().lower() == "yes":
-            delay_msg = await bot.ask(OWNER_ID, "In how many minutes should the movie drop?", timeout=120)
+            delay_msg = await bot.ask(OWNER_ID, "⏱ In how many minutes should the movie drop?", timeout=120)
             try:
                 minutes = int(delay_msg.text.strip())
                 muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
@@ -194,18 +193,14 @@ def format_file_size(size_bytes):
 
 async def movie_name_format(file_name):
     return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
-        .replace("_", " ")
-        .replace("[", "").replace("]", "")
-        .replace("(", "").replace(")", "")
-        .replace("{", "").replace("}", "")
-        .replace(".", " ").replace("@", "")
-        .replace(":", "").replace(";", "")
-        .replace("'", "").replace("-", "")
-        .replace("!", "")).strip()
+        .replace("_", " ").replace("[", "").replace("]", "")
+        .replace("(", "").replace(")", "").replace("{", "").replace("}", "")
+        .replace(".", " ").replace("@", "").replace(":", "")
+        .replace(";", "").replace("'", "").replace("-", "").replace("!", "")).strip()
 
 async def get_qualities(text):
     qualities = [
-        "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p", 
+        "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
         "HDRip", "HDCAM", "WEB-DL", "PreDVD", "CAMRip", "DVDScr"
     ]
     found = [q for q in qualities if q.lower() in text.lower()]
