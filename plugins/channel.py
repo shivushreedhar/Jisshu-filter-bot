@@ -35,7 +35,6 @@ processing_movies = set()
 async def media(bot, message):
     try:
         print(f"📥 File received in DB channel: {message.chat.id}")
-        bot_id = bot.me.id
         media = getattr(message, message.media.value, None)
 
         if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
@@ -55,7 +54,6 @@ async def queue_movie_file(bot, media):
         caption = await movie_name_format(media.caption or "")
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
-
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption) or re.search(r"(?i)(?:s|season)0*(\d{1,2})", file_name)
         if year:
             file_name = file_name[: file_name.find(year) + 4]
@@ -86,7 +84,7 @@ async def queue_movie_file(bot, media):
         await asyncio.sleep(POST_DELAY)
 
         if file_name in movie_files:
-            await send_movie_update(bot, file_name, movie_files[file_name])
+            await schedule_movie_post(bot, file_name, movie_files[file_name])
             del movie_files[file_name]
 
         processing_movies.remove(file_name)
@@ -95,6 +93,24 @@ async def queue_movie_file(bot, media):
         print(f"❌ queue_movie_file error: {e}")
         processing_movies.discard(file_name)
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
+
+async def schedule_movie_post(bot, file_name, files):
+    try:
+        OWNER_ID = OWNER_IDS[0] if isinstance(OWNER_IDS, list) else OWNER_IDS
+        ask = await bot.ask(OWNER_ID, f"Do you want to schedule the post for '{file_name}'? (yes/no)", timeout=180)
+        if ask.text.strip().lower() == "yes":
+            delay_msg = await bot.ask(OWNER_ID, "In how many minutes should the movie drop?", timeout=120)
+            try:
+                minutes = int(delay_msg.text.strip())
+                muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
+                await bot.send_message(muc_id, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...")
+                await asyncio.sleep(minutes * 60)
+            except Exception as e:
+                await bot.send_message(LOG_CHANNEL, f"❌ Invalid delay input or error: {e}")
+        await send_movie_update(bot, file_name, files)
+    except Exception as e:
+        print(f"❌ schedule_movie_post error: {e}")
+        await bot.send_message(LOG_CHANNEL, f"❌ schedule_movie_post error: {e}")
 
 async def send_movie_update(bot, file_name, files):
     try:
