@@ -28,14 +28,14 @@ media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
-logged_chats = set()  # Prevent repeated group logs
+logged_chat_ids = set()
 
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
     try:
-        if message.chat.id != 0 and message.chat.id not in logged_chats:
+        if message.chat.id not in logged_chat_ids:
             print(f"Group Id - {message.chat.id}")
-            logged_chats.add(message.chat.id)
+            logged_chat_ids.add(message.chat.id)
 
         print(f"📥 File received in DB channel: {message.chat.id}")
         media = getattr(message, message.media.value, None)
@@ -102,6 +102,8 @@ async def schedule_movie_post(bot, file_name, files):
         await reply.delete()
 
         wait_minutes = 0
+        custom_poster = None
+
         if reply.text.strip().lower() == "yes":
             delay_msg = await bot.send_message(OWNER_ID, "In how many minutes should the movie drop?")
             delay_reply = await bot.listen(OWNER_ID, timeout=120)
@@ -120,7 +122,6 @@ async def schedule_movie_post(bot, file_name, files):
         image_reply = await bot.listen(OWNER_ID, timeout=180)
         await image_msg.delete()
         await image_reply.delete()
-        custom_poster = None
 
         if image_reply.photo:
             custom_poster = image_reply.photo.file_id
