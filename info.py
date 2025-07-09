@@ -70,22 +70,22 @@ MOVIE_GROUP_LINK = environ.get("MOVIE_GROUP_LINK", "BSHEGDEMOVIE")
 # Verification
 IS_VERIFY = is_enabled("IS_VERIFY", True)
 # ---------------------------------------------------------------
-TUTORIAL = environ.get("TUTORIAL", "https://t.me/bshowtodownload/20")
-TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/bshowtodownload/20")
-TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/bshowtodownload/20")
+TUTORIAL = environ.get("TUTORIAL", "https://t.me/bshowtodownload/22")
+TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/bshowtodownload/22")
+TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/bshowtodownload/22")
 VERIFY_IMG = environ.get(
     "VERIFY_IMG", "https://graph.org/file/1669ab9af68eaa62c3ca4.jpg"
 )
-SHORTENER_API = environ.get("SHORTENER_API", "407cf41fa5b0bcc37701f80b27acfb28b94054d0")
-SHORTENER_WEBSITE = environ.get("SHORTENER_WEBSITE", "seturl.in")
+SHORTENER_API = environ.get("SHORTENER_API", "1df09b3a5df1a7898a19dac1b6dccd570abea62e")
+SHORTENER_WEBSITE = environ.get("SHORTENER_WEBSITE", "vplink.in")
 SHORTENER_API2 = environ.get(
-    "SHORTENER_API2", "407cf41fa5b0bcc37701f80b27acfb28b94054d0"
+    "SHORTENER_API2", "1df09b3a5df1a7898a19dac1b6dccd570abea62e"
 )
-SHORTENER_WEBSITE2 = environ.get("SHORTENER_WEBSITE2", "seturl.in")
+SHORTENER_WEBSITE2 = environ.get("SHORTENER_WEBSITE2", "vplink.in")
 SHORTENER_API3 = environ.get(
-    "SHORTENER_API3", "407cf41fa5b0bcc37701f80b27acfb28b94054d0"
+    "SHORTENER_API3", "1df09b3a5df1a7898a19dac1b6dccd570abea62e"
 )
-SHORTENER_WEBSITE3 = environ.get("SHORTENER_WEBSITE3", "seturl.in")
+SHORTENER_WEBSITE3 = environ.get("SHORTENER_WEBSITE3", "vplink.in")
 TWO_VERIFY_GAP = int(environ.get("TWO_VERIFY_GAP", "14400"))
 THREE_VERIFY_GAP = int(environ.get("THREE_VERIFY_GAP", "14400"))
 
