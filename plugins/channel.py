@@ -28,10 +28,15 @@ media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
+logged_chats = set()  # Prevent repeated group logs
 
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
     try:
+        if message.chat.id != 0 and message.chat.id not in logged_chats:
+            print(f"Group Id - {message.chat.id}")
+            logged_chats.add(message.chat.id)
+
         print(f"📥 File received in DB channel: {message.chat.id}")
         media = getattr(message, message.media.value, None)
         if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
@@ -104,8 +109,7 @@ async def schedule_movie_post(bot, file_name, files):
             await delay_reply.delete()
             try:
                 wait_minutes = int(delay_reply.text.strip())
-                muc_id = MOVIE_UPDATE_CHANNEL
-                await bot.send_message(muc_id, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...", parse_mode=enums.ParseMode.HTML)
+                await bot.send_message(MOVIE_UPDATE_CHANNEL, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...", parse_mode=enums.ParseMode.HTML)
                 await asyncio.sleep(wait_minutes * 60)
             except Exception as e:
                 await bot.send_message(LOG_CHANNEL, f"❌ Invalid delay input or error: {e}")
@@ -150,8 +154,7 @@ async def send_movie_update(bot, file_name, files, custom_poster=None):
             quality_text += f"📦 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         caption = UPDATE_CAPTION.format(kind, title, year, files[0]["quality"], language, quality_text)
-        muc_id = MOVIE_UPDATE_CHANNEL
-        await bot.send_photo(chat_id=muc_id, photo=poster, caption=caption, parse_mode=enums.ParseMode.HTML)
+        await bot.send_photo(chat_id=MOVIE_UPDATE_CHANNEL, photo=poster, caption=caption, parse_mode=enums.ParseMode.HTML)
 
     except Exception as e:
         print(f"❌ send_movie_update error: {e}")
@@ -185,7 +188,6 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
                     posters = data.get(key)
                     if posters and isinstance(posters, list) and posters:
                         return posters[0]
-                print(f"No poster found for {title}")
                 return None
     except Exception as e:
         print(f"❌ Poster fetch error: {e}")
@@ -221,4 +223,4 @@ async def Jisshu_qualities(text, file_name):
         if "hevc" not in q.lower() and q.lower() in text:
             return q
     return "720p"
- 
+    
