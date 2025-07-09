@@ -61,7 +61,7 @@ REQUEST_CHANNEL = (
     if request_channel and id_pattern.search(request_channel)
     else None
 )
-MOVIE_UPDATE_CHANNEL = int(environ.get("MOVIE_UPDATE_CHANNEL", "-1002773062148"))
+MOVIE_UPDATE_CHANNEL = int(environ.get("MOVIE_UPDATE_CHANNEL", "-1002762317286"))
 
 # Added Link Here Not Id
 SUPPORT_CHAT = environ.get("SUPPORT_CHAT", "BSHEGDE5")
