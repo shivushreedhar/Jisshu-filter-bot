@@ -1,4 +1,4 @@
-import re, hashlib, asyncio, aiohttp
+import re, asyncio, aiohttp
 from typing import Optional
 from collections import defaultdict
 from pyrogram import Client, filters, enums
@@ -7,12 +7,10 @@ from utils import *
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
 
-CAPTION_LANGUAGES = [
-    "Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu",
-    "Malayalam", "Kannada", "Marathi", "Punjabi", "Bengoli", "Gujrati",
-    "Korean", "Gujarati", "Spanish", "French", "German", "Chinese", "Arabic",
-    "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"
-]
+CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu",
+    "Malayalam", "Kannada", "Marathi", "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
+    "Spanish", "French", "German", "Chinese", "Arabic", "Portuguese", "Russian", "Japanese",
+    "Odia", "Assamese", "Urdu"]
 
 UPDATE_CAPTION = """<b>𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</b>
 
@@ -35,9 +33,7 @@ processing_movies = set()
 async def media(bot, message):
     try:
         print(f"📥 File received in DB channel: {message.chat.id}")
-        bot_id = bot.me.id
         media = getattr(message, message.media.value, None)
-
         if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
             media.file_type = message.media.value
             media.caption = message.caption
@@ -55,8 +51,8 @@ async def queue_movie_file(bot, media):
         caption = await movie_name_format(media.caption or "")
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
-
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption) or re.search(r"(?i)(?:s|season)0*(\d{1,2})", file_name)
+
         if year:
             file_name = file_name[: file_name.find(year) + 4]
         elif season_match:
@@ -70,13 +66,9 @@ async def queue_movie_file(bot, media):
         file_id, file_ref = unpack_new_file_id(media.file_id)
 
         movie_files[file_name].append({
-            "quality": quality,
-            "jisshuquality": jisshuquality,
-            "file_id": file_id,
-            "file_size": file_size_str,
-            "caption": caption,
-            "language": language,
-            "year": year,
+            "quality": quality, "jisshuquality": jisshuquality,
+            "file_id": file_id, "file_size": file_size_str,
+            "caption": caption, "language": language, "year": year
         })
 
         if file_name in processing_movies:
@@ -86,7 +78,7 @@ async def queue_movie_file(bot, media):
         await asyncio.sleep(POST_DELAY)
 
         if file_name in movie_files:
-            await send_movie_update(bot, file_name, movie_files[file_name])
+            await schedule_movie_post(bot, file_name, movie_files[file_name])
             del movie_files[file_name]
 
         processing_movies.remove(file_name)
@@ -96,16 +88,53 @@ async def queue_movie_file(bot, media):
         processing_movies.discard(file_name)
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
 
-async def send_movie_update(bot, file_name, files):
+async def schedule_movie_post(bot, file_name, files):
+    try:
+        OWNER_ID = 5536032493
+        ask_msg = await bot.send_message(OWNER_ID, f"Do you want to schedule the post for '{file_name}'? (yes/no)")
+        reply = await bot.listen(OWNER_ID, timeout=180)
+        await ask_msg.delete()
+        await reply.delete()
+
+        wait_minutes = 0
+        if reply.text.strip().lower() == "yes":
+            delay_msg = await bot.send_message(OWNER_ID, "In how many minutes should the movie drop?")
+            delay_reply = await bot.listen(OWNER_ID, timeout=120)
+            await delay_msg.delete()
+            await delay_reply.delete()
+            try:
+                wait_minutes = int(delay_reply.text.strip())
+                muc_id = MOVIE_UPDATE_CHANNEL
+                await bot.send_message(muc_id, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...", parse_mode=enums.ParseMode.HTML)
+                await asyncio.sleep(wait_minutes * 60)
+            except Exception as e:
+                await bot.send_message(LOG_CHANNEL, f"❌ Invalid delay input or error: {e}")
+        else:
+            await asyncio.sleep(2)
+
+        image_msg = await bot.send_message(OWNER_ID, f"Send custom image for '{file_name}' poster or skip...")
+        image_reply = await bot.listen(OWNER_ID, timeout=180)
+        await image_msg.delete()
+        await image_reply.delete()
+        custom_poster = None
+
+        if image_reply.photo:
+            custom_poster = image_reply.photo.file_id
+
+        await send_movie_update(bot, file_name, files, custom_poster)
+
+    except Exception as e:
+        print(f"❌ schedule_movie_post error: {e}")
+        await bot.send_message(LOG_CHANNEL, f"❌ schedule_movie_post error: {e}")
+
+async def send_movie_update(bot, file_name, files, custom_poster=None):
     try:
         imdb_data = await get_imdb(file_name)
         title = imdb_data.get("title", file_name)
         kind = imdb_data.get("kind", "").strip().upper().replace(" ", "_")
-        if kind == "TV_SERIES":
-            kind = "SERIES"
-
+        kind = "SERIES" if kind == "TV_SERIES" else kind
         year = imdb_data.get("year", files[0]["year"])
-        poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+        poster = custom_poster or await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
         languages = set()
         for file in files:
@@ -121,15 +150,8 @@ async def send_movie_update(bot, file_name, files):
             quality_text += f"📦 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         caption = UPDATE_CAPTION.format(kind, title, year, files[0]["quality"], language, quality_text)
-        muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
-        print("📨 Sending update to MUC:", muc_id)
-
-        await bot.send_photo(
-            chat_id=muc_id,
-            photo=poster,
-            caption=caption,
-            parse_mode=enums.ParseMode.HTML
-        )
+        muc_id = MOVIE_UPDATE_CHANNEL
+        await bot.send_photo(chat_id=muc_id, photo=poster, caption=caption, parse_mode=enums.ParseMode.HTML)
 
     except Exception as e:
         print(f"❌ send_movie_update error: {e}")
@@ -178,25 +200,18 @@ def format_file_size(size_bytes):
 
 async def movie_name_format(file_name):
     return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
-        .replace("_", " ")
-        .replace("[", "").replace("]", "")
-        .replace("(", "").replace(")", "")
-        .replace("{", "").replace("}", "")
-        .replace(".", " ").replace("@", "")
-        .replace(":", "").replace(";", "")
-        .replace("'", "").replace("-", "")
-        .replace("!", "")).strip()
+        .replace("_", " ").replace("[", "").replace("]", "")
+        .replace("(", "").replace(")", "").replace("{", "").replace("}", "")
+        .replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
+        .replace("'", "").replace("-", "").replace("!", "")).strip()
 
 async def get_qualities(text):
-    qualities = [
-        "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p", 
-        "HDRip", "HDCAM", "WEB-DL", "PreDVD", "CAMRip", "DVDScr"
-    ]
+    qualities = ["480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip", "HDCAM", "WEB-DL", "PreDVD", "CAMRip", "DVDScr"]
     found = [q for q in qualities if q.lower() in text.lower()]
     return ", ".join(found) or "HDRip"
 
 async def Jisshu_qualities(text, file_name):
-    qualities = ["480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"]
+    qualities = ["360p", "480p", "540p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"]
     text = (text + " " + file_name).lower()
     if "hevc" in text:
         for q in qualities:
