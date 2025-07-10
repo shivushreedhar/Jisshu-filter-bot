@@ -21,15 +21,15 @@ LANGUAGE_KEYWORDS = {
 
 UPDATE_CAPTION = """<b><blockquote>TRENDING 𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote></b>
 
-🎬 <b>Title:{} {}</b>
-🔰 <b>Quality:{}</b>
-🎧 <b>Audio:{}</b>
+🎬 <b>Title: {} {}</b>
+🔰 <b>Quality: {}</b>
+🎧 <b>Audio: {}</b>
 
 <b>✨ Telegram Files ✨</b>
 
 {}
 
-<blockquote>〽️ Powered by @BSHEGDE5</blockquote>"""
+<b><blockquote>〽️ Powered by @BSHEGDE5</blockquote></b>"""
 
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
