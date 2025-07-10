@@ -7,27 +7,20 @@ from utils import *
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
 
-CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu",
-    "Malayalam", "Kannada", "Marathi", "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
-    "Spanish", "French", "German", "Chinese", "Arabic", "Portuguese", "Russian", "Japanese",
-    "Odia", "Assamese", "Urdu"]
+CAPTION_LANGUAGES = [
+    "Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu", "Malayalam", "Kannada",
+    "Marathi", "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati", "Spanish", "French",
+    "German", "Chinese", "Arabic", "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"
+]
 
-LANGUAGE_ALIASES = {
-    "tam": "Tamil", "tel": "Telugu", "hin": "Hindi", "kan": "Kannada",
-    "mal": "Malayalam", "eng": "English", "mar": "Marathi", "ben": "Bengali",
-    "pun": "Punjabi", "urd": "Urdu", "guj": "Gujarati", "bho": "Bhojpuri",
+LANGUAGE_SHORTCODES = {
+    "Hindi": "Hin", "Tamil": "Tam", "Telugu": "Tel", "Kannada": "Kan", "Malayalam": "Mal",
+    "English": "Eng", "Bengali": "Ben", "Bhojpuri": "Bho", "Bangla": "Ban", "Marathi": "Mar",
+    "Punjabi": "Pun", "Gujrati": "Guj", "Gujarati": "Guj", "Korean": "Kor", "Spanish": "Spa",
+    "French": "Fre", "German": "Ger", "Chinese": "Chi", "Arabic": "Ara", "Portuguese": "Por",
+    "Russian": "Rus", "Japanese": "Jap", "Odia": "Odi", "Assamese": "Asm", "Urdu": "Urd",
+    "Bengoli": "Ben"
 }
-
-def detect_languages(text):
-    found = set()
-    lowered = text.lower()
-    for full in CAPTION_LANGUAGES:
-        if full.lower() in lowered:
-            found.add(full)
-    for abbr, full in LANGUAGE_ALIASES.items():
-        if abbr in lowered:
-            found.add(full)
-    return " + ".join(sorted(found)) if found else "Not Idea"
 
 UPDATE_CAPTION = """<b>𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</b>
 
@@ -45,18 +38,13 @@ media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
-logged_chat_ids = set()
 
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
     try:
-        if message.chat.id not in logged_chat_ids:
-            print(f"Group Id - {message.chat.id}")
-            logged_chat_ids.add(message.chat.id)
-
         print(f"📥 File received in DB channel: {message.chat.id}")
         media = getattr(message, message.media.value, None)
-        if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
+        if media.mime_type in ["video/mp4", "video/x-matroska", "application/octet-stream"]:
             media.file_type = message.media.value
             media.caption = message.caption
             status = await save_file(media)
@@ -83,9 +71,12 @@ async def queue_movie_file(bot, media):
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
-        language = detect_languages(caption)
         file_size_str = format_file_size(media.file_size)
-        file_id, file_ref = unpack_new_file_id(media.file_id)
+        file_id, _ = unpack_new_file_id(media.file_id)
+
+        langs = [short for lang in CAPTION_LANGUAGES if lang.lower() in caption.lower()
+                 for short in [LANGUAGE_SHORTCODES.get(lang)] if short]
+        language = " + ".join(sorted(set(langs))) if langs else "No Idea"
 
         movie_files[file_name].append({
             "quality": quality, "jisshuquality": jisshuquality,
@@ -126,22 +117,19 @@ async def schedule_movie_post(bot, file_name, files):
             delay_reply = await bot.listen(OWNER_ID, timeout=120)
             await delay_msg.delete()
             await delay_reply.delete()
-            try:
-                wait_minutes = int(delay_reply.text.strip())
-                await bot.send_message(MOVIE_UPDATE_CHANNEL, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...", parse_mode=enums.ParseMode.HTML)
-                await asyncio.sleep(wait_minutes * 60)
-            except Exception as e:
-                await bot.send_message(LOG_CHANNEL, f"❌ Invalid delay input or error: {e}")
-        else:
-            await asyncio.sleep(2)
+            wait_minutes = int(delay_reply.text.strip())
 
+        # Ask for custom image immediately after schedule (not after delay)
         image_msg = await bot.send_message(OWNER_ID, f"Send custom image for '{file_name}' poster or skip...")
         image_reply = await bot.listen(OWNER_ID, timeout=180)
         await image_msg.delete()
         await image_reply.delete()
-
         if image_reply.photo:
             custom_poster = image_reply.photo.file_id
+
+        if wait_minutes > 0:
+            await bot.send_message(MOVIE_UPDATE_CHANNEL, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...", parse_mode=enums.ParseMode.HTML)
+            await asyncio.sleep(wait_minutes * 60)
 
         await send_movie_update(bot, file_name, files, custom_poster)
 
@@ -158,12 +146,7 @@ async def send_movie_update(bot, file_name, files, custom_poster=None):
         year = imdb_data.get("year", files[0]["year"])
         poster = custom_poster or await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-        languages = set()
-        for file in files:
-            if file["language"] != "Not Idea":
-                languages.update(file["language"].split(" + "))
-        language = " + ".join(sorted(languages)) or "Not Idea"
-
+        language = files[0]["language"]
         quality_text = ""
         for file in files:
             q = file.get("jisshuquality") or file.get("quality") or "Unknown"
@@ -177,6 +160,8 @@ async def send_movie_update(bot, file_name, files, custom_poster=None):
     except Exception as e:
         print(f"❌ send_movie_update error: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ send_movie_update error: {e}")
+
+# Utility functions
 
 async def get_imdb(file_name):
     try:
@@ -199,7 +184,6 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
             url = f"https://jisshuapis.vercel.app/api.php?query={query}"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as res:
                 if res.status != 200:
-                    print(f"Poster API error: HTTP {res.status}")
                     return None
                 data = await res.json()
                 for key in ["jisshu-2", "jisshu-3", "jisshu-4"]:
