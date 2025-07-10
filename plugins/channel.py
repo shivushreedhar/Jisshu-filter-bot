@@ -2,6 +2,7 @@ import re, asyncio, aiohttp
 from typing import Optional
 from collections import defaultdict
 from pyrogram import Client, filters, enums
+
 from info import *
 from utils import *
 from database.users_chats_db import db
@@ -27,7 +28,7 @@ LANGUAGE_KEYWORDS = {
 }
 
 UPDATE_CAPTION = """
-<blockquote>🔥 <b>Trending Files</b></blockquote>
+<blockquote>🔥 <b>{}</b></blockquote>
 
 🎬 <b>{}</b>
 🗓️ <b>Year:</b> {}
@@ -86,7 +87,6 @@ async def queue_movie_file(bot, media):
             del movie_files[file_name]
 
         processing_movies.remove(file_name)
-
     except Exception as e:
         print(f"❌ queue_movie_file error: {e}")
         processing_movies.discard(file_name)
@@ -94,31 +94,31 @@ async def queue_movie_file(bot, media):
 
 async def send_movie_post(bot, file_name, files):
     try:
-        ask_img = await bot.send_message(OWNER_ID, f"Send custom image for <code>{file_name}</code> poster or skip.")
+        ask_img = await bot.send_message(OWNER_ID, f"Send custom image for <code>{file_name}</code> or skip.")
         reply_img = await bot.listen(OWNER_ID, timeout=180)
         await ask_img.delete()
         await reply_img.delete()
         custom_poster = None
-
         if reply_img.photo:
             custom_poster = reply_img.photo.file_id
 
         imdb = await get_imdb(file_name)
         title = imdb.get("title", file_name)
         year = imdb.get("year", files[0]["year"])
+        kind = imdb.get("kind", "").lower()
+        header = "Trending New Series" if kind == "tv series" else "Trending New Movie"
         poster = custom_poster or await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
         language = merge_languages([f["language"] for f in files])
-        quality_text = ""
 
+        quality_text = ""
         for f in files:
             q = f.get("jisshuquality") or f.get("quality")
             size = f["file_size"]
             fid = f["file_id"]
             quality_text += f"📥 <b>{q}</b>: <a href='https://t.me/{temp.U_NAME}?start=file_0_{fid}'>{size}</a>\n"
 
-        caption = UPDATE_CAPTION.format(title, year, language, files[0]["quality"], quality_text)
+        caption = UPDATE_CAPTION.format(header, title, year, language, files[0]["quality"], quality_text)
         await bot.send_photo(MOVIE_UPDATE_CHANNEL, poster, caption=caption, parse_mode=enums.ParseMode.HTML)
-
     except Exception as e:
         print(f"❌ send_movie_post error: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ send_movie_post error: {e}")
@@ -191,7 +191,8 @@ async def get_imdb(name):
         return {
             "title": imdb.get("title", formatted),
             "year": imdb.get("year"),
-            "url": imdb.get("url"),
+            "kind": imdb.get("kind", "movie"),
+            "url": imdb.get("url")
         } if imdb else {}
     except Exception as e:
         print(f"❌ IMDb fetch error: {e}")
