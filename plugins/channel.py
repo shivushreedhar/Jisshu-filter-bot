@@ -12,6 +12,23 @@ CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla
     "Spanish", "French", "German", "Chinese", "Arabic", "Portuguese", "Russian", "Japanese",
     "Odia", "Assamese", "Urdu"]
 
+LANGUAGE_ALIASES = {
+    "tam": "Tamil", "tel": "Telugu", "hin": "Hindi", "kan": "Kannada",
+    "mal": "Malayalam", "eng": "English", "mar": "Marathi", "ben": "Bengali",
+    "pun": "Punjabi", "urd": "Urdu", "guj": "Gujarati", "bho": "Bhojpuri",
+}
+
+def detect_languages(text):
+    found = set()
+    lowered = text.lower()
+    for full in CAPTION_LANGUAGES:
+        if full.lower() in lowered:
+            found.add(full)
+    for abbr, full in LANGUAGE_ALIASES.items():
+        if abbr in lowered:
+            found.add(full)
+    return " + ".join(sorted(found)) if found else "Not Idea"
+
 UPDATE_CAPTION = """<b>𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</b>
 
 🎬 <b>{} {}</b>
@@ -66,7 +83,7 @@ async def queue_movie_file(bot, media):
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
-        language = ", ".join([lang for lang in CAPTION_LANGUAGES if lang.lower() in caption.lower()]) or "Not Idea"
+        language = detect_languages(caption)
         file_size_str = format_file_size(media.file_size)
         file_id, file_ref = unpack_new_file_id(media.file_id)
 
@@ -144,8 +161,8 @@ async def send_movie_update(bot, file_name, files, custom_poster=None):
         languages = set()
         for file in files:
             if file["language"] != "Not Idea":
-                languages.update(file["language"].split(", "))
-        language = ", ".join(sorted(languages)) or "Not Idea"
+                languages.update(file["language"].split(" + "))
+        language = " + ".join(sorted(languages)) or "Not Idea"
 
         quality_text = ""
         for file in files:
