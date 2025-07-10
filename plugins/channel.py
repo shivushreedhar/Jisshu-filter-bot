@@ -19,9 +19,9 @@ LANGUAGE_KEYWORDS = {
     "gujarati": "Gujarati", "urdu": "Urdu"
 }
 
-UPDATE_CAPTION = """<b><blockquote> TRENDING 𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote></b>
+UPDATE_CAPTION = """<b><blockquote>TRENDING 𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote></b>
 
-🎬 <b>{} {}</b>
+🎬 <b>Title:{} {}</b>
 🔰 <b>Quality:{}</b>
 🎧 <b>Audio:{}</b>
 
@@ -29,7 +29,7 @@ UPDATE_CAPTION = """<b><blockquote> TRENDING 𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤�
 
 {}
 
-<b><blockquote>〽️ Powered by @BSHEGDE5</blockquote></b>"""
+<blockquote>〽️ Powered by @BSHEGDE5</blockquote>"""
 
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
@@ -67,7 +67,11 @@ async def queue_movie_file(bot, media):
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
 
         text = f"{file_name} {caption}".lower()
-        language = "Kannada" if any(k in text for k, v in LANGUAGE_KEYWORDS.items() if v == "Kannada") else "Not Identified"
+        found_langs = set()
+        for key, lang in LANGUAGE_KEYWORDS.items():
+            if re.search(rf"\b{key}\b", text):
+                found_langs.add(lang)
+        language = ", ".join(sorted(found_langs)) if found_langs else "Not Identified"
 
         file_size_str = format_file_size(media.file_size)
         file_id, file_ref = unpack_new_file_id(media.file_id)
@@ -107,7 +111,7 @@ async def send_movie_update(bot, file_name, files):
         year = imdb_data.get("year", files[0]["year"])
         poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-        language = "Kannada" if any(f["language"] == "Kannada" for f in files) else "Not Identified"
+        language = files[0]["language"]
 
         quality_text = ""
         for file in files:
@@ -132,7 +136,7 @@ async def get_imdb(file_name):
             "year": imdb.get("year"),
             "url": imdb.get("url"),
         } if imdb else {}
-    except Exception as e:
+    except Exception:
         return {}
 
 async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional[str]:
