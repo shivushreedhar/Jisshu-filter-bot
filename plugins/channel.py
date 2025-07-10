@@ -1,8 +1,8 @@
 import re, asyncio, aiohttp
 from typing import Optional
 from collections import defaultdict
-from pyrogram import Client, filters, enums
 
+from pyrogram import Client, filters, enums
 from info import *
 from utils import *
 from database.users_chats_db import db
@@ -11,6 +11,7 @@ from database.ia_filterdb import save_file, unpack_new_file_id
 OWNER_ID = 5536032493
 POST_DELAY = 25
 MOVIE_UPDATE_CHANNEL = -1002762317286
+
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
 processing_movies = set()
@@ -71,9 +72,13 @@ async def queue_movie_file(bot, media):
         file_id, file_ref = unpack_new_file_id(media.file_id)
 
         movie_files[file_name].append({
-            "quality": quality, "jisshuquality": jisshuquality,
-            "file_id": file_id, "file_size": file_size,
-            "caption": caption, "language": language, "year": year
+            "quality": quality,
+            "jisshuquality": jisshuquality,
+            "file_id": file_id,
+            "file_size": file_size,
+            "caption": caption,
+            "language": language,
+            "year": year
         })
 
         if file_name in processing_movies:
@@ -98,17 +103,16 @@ async def send_movie_post(bot, file_name, files):
         reply_img = await bot.listen(OWNER_ID, timeout=180)
         await ask_img.delete()
         await reply_img.delete()
+
         custom_poster = None
         if reply_img.photo:
             custom_poster = reply_img.photo.file_id
 
-        imdb = await get_imdb(file_name)
-        title = imdb.get("title", file_name)
-        year = imdb.get("year", files[0]["year"])
-        kind = imdb.get("kind", "").lower()
-        header = "Trending New Series" if kind == "tv series" else "Trending New Movie"
-        poster = custom_poster or await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+        title = extract_clean_title(file_name)
+        year = files[0]["year"]
         language = merge_languages([f["language"] for f in files])
+        poster = custom_poster or await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+        header = "🔥 Trending Movie"
 
         quality_text = ""
         for f in files:
@@ -122,6 +126,15 @@ async def send_movie_post(bot, file_name, files):
     except Exception as e:
         print(f"❌ send_movie_post error: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ send_movie_post error: {e}")
+
+def extract_clean_title(name: str) -> str:
+    name = re.sub(r'\([^)]*\)', '', name)
+    name = re.sub(r'\b(480p|720p|1080p|2160p|HDRip|WEB[- ]DL|PreDVD|CAMRip|AV1|HEVC|AAC|2\.0|5\.1|128K|MB|YT|MGBM)\b', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'\b(Kannada|Telugu|Tamil|Hindi|Malayalam|English|Bengali|Marathi|Punjabi|Gujarati|Urdu)\b', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'[-_.]', ' ', name)
+    name = re.sub(r'\d+MB', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'\s+', ' ', name)
+    return name.strip()
 
 def detect_languages(text: str) -> str:
     text = text.lower()
@@ -183,18 +196,4 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None):
     except Exception as e:
         print(f"❌ Poster fetch error: {e}")
     return None
-
-async def get_imdb(name):
-    try:
-        formatted = await movie_name_format(name)
-        imdb = await get_poster(formatted)
-        return {
-            "title": imdb.get("title", formatted),
-            "year": imdb.get("year"),
-            "kind": imdb.get("kind", "movie"),
-            "url": imdb.get("url")
-        } if imdb else {}
-    except Exception as e:
-        print(f"❌ IMDb fetch error: {e}")
-        return {}
-        
+    
