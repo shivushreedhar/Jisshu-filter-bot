@@ -91,7 +91,7 @@ async def queue_movie_file(bot, media):
         await asyncio.sleep(POST_DELAY)
 
         if file_name in movie_files:
-            await schedule_movie_post(bot, file_name, movie_files[file_name])
+            await post_movie(bot, file_name, movie_files[file_name])
             del movie_files[file_name]
 
         processing_movies.remove(file_name)
@@ -101,41 +101,24 @@ async def queue_movie_file(bot, media):
         processing_movies.discard(file_name)
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
 
-async def schedule_movie_post(bot, file_name, files):
+async def post_movie(bot, file_name, files):
     try:
         OWNER_ID = 5536032493
-        ask_msg = await bot.send_message(OWNER_ID, f"Do you want to schedule the post for '{file_name}'? (yes/no)")
+        custom_poster = None
+
+        ask_msg = await bot.send_message(OWNER_ID, f"Send custom image for '{file_name}' poster or skip...")
         reply = await bot.listen(OWNER_ID, timeout=180)
         await ask_msg.delete()
         await reply.delete()
 
-        wait_minutes = 0
-        custom_poster = None
-
-        if reply.text.strip().lower() == "yes":
-            delay_msg = await bot.send_message(OWNER_ID, "In how many minutes should the movie drop?")
-            delay_reply = await bot.listen(OWNER_ID, timeout=120)
-            await delay_msg.delete()
-            await delay_reply.delete()
-            wait_minutes = int(delay_reply.text.strip())
-
-        # Ask for custom image immediately after schedule (not after delay)
-        image_msg = await bot.send_message(OWNER_ID, f"Send custom image for '{file_name}' poster or skip...")
-        image_reply = await bot.listen(OWNER_ID, timeout=180)
-        await image_msg.delete()
-        await image_reply.delete()
-        if image_reply.photo:
-            custom_poster = image_reply.photo.file_id
-
-        if wait_minutes > 0:
-            await bot.send_message(MOVIE_UPDATE_CHANNEL, f"🎬 <b>{file_name}</b>\n🚀 Dropping soon...", parse_mode=enums.ParseMode.HTML)
-            await asyncio.sleep(wait_minutes * 60)
+        if reply.photo:
+            custom_poster = reply.photo.file_id
 
         await send_movie_update(bot, file_name, files, custom_poster)
 
     except Exception as e:
-        print(f"❌ schedule_movie_post error: {e}")
-        await bot.send_message(LOG_CHANNEL, f"❌ schedule_movie_post error: {e}")
+        print(f"❌ post_movie error: {e}")
+        await bot.send_message(LOG_CHANNEL, f"❌ post_movie error: {e}")
 
 async def send_movie_update(bot, file_name, files, custom_poster=None):
     try:
@@ -161,7 +144,7 @@ async def send_movie_update(bot, file_name, files, custom_poster=None):
         print(f"❌ send_movie_update error: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ send_movie_update error: {e}")
 
-# Utility functions
+# Utility Functions
 
 async def get_imdb(file_name):
     try:
