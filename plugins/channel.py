@@ -27,7 +27,7 @@ LANGUAGE_KEYWORDS = {
 }
 
 UPDATE_CAPTION = """
-<blockquote>🔥 <b>Trending New Movie</b></blockquote>
+<blockquote>🔥 <b>Trending Files</b></blockquote>
 
 🎬 <b>{}</b>
 🗓️ <b>Year:</b> {}
