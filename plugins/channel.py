@@ -1,6 +1,7 @@
 import re, asyncio, aiohttp
 from typing import Optional
 from collections import defaultdict
+
 from pyrogram import Client, filters, enums
 from info import *
 from utils import *
@@ -21,9 +22,9 @@ LANGUAGE_KEYWORDS = {
 
 UPDATE_CAPTION = """<b><blockquote>TRENDING 𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote></b>
 
-🎬 <b>Title: {} {}</b>
-🔰 <b>Quality: {}</b>
-🎧 <b>Audio: {}</b>
+🎬 <b>Title : {} {}</b>
+🔰 <b>Quality : {}</b>
+🎧 <b>Audio : {}</b>
 
 <b>✨ Telegram Files ✨</b>
 
@@ -53,30 +54,35 @@ async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
+
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
+
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption) or re.search(r"(?i)(?:s|season)0*(\d{1,2})", file_name)
 
-        if year:
-            file_name = file_name[: file_name.find(year) + 4]
+        # Use key for grouping
+        if year and year in file_name:
+            key = file_name[: file_name.find(year) + 4]
         elif season_match:
             season = season_match.group(1)
-            file_name = file_name[: file_name.find(season) + 1]
+            key = file_name[: file_name.find(season) + len(season)]
+        else:
+            key = file_name.split()[0]
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
 
         text = f"{file_name} {caption}".lower()
         found_langs = set()
-        for key, lang in LANGUAGE_KEYWORDS.items():
-            if re.search(rf"\b{key}\b", text):
+        for k, lang in LANGUAGE_KEYWORDS.items():
+            if re.search(rf"\b{k}\b", text):
                 found_langs.add(lang)
         language = ", ".join(sorted(found_langs)) if found_langs else "Not Identified"
 
         file_size_str = format_file_size(media.file_size)
         file_id, file_ref = unpack_new_file_id(media.file_id)
 
-        movie_files[file_name].append({
+        movie_files[key].append({
             "quality": quality,
             "jisshuquality": jisshuquality,
             "file_id": file_id,
@@ -86,20 +92,20 @@ async def queue_movie_file(bot, media):
             "year": year
         })
 
-        if file_name in processing_movies:
+        if key in processing_movies:
             return
 
-        processing_movies.add(file_name)
+        processing_movies.add(key)
         await asyncio.sleep(POST_DELAY)
 
-        if file_name in movie_files:
-            await send_movie_update(bot, file_name, movie_files[file_name])
-            del movie_files[file_name]
+        if key in movie_files:
+            await send_movie_update(bot, key, movie_files[key])
+            del movie_files[key]
 
-        processing_movies.remove(file_name)
+        processing_movies.remove(key)
 
     except Exception as e:
-        processing_movies.discard(file_name)
+        processing_movies.discard(key)
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
 
 async def send_movie_update(bot, file_name, files):
@@ -112,7 +118,6 @@ async def send_movie_update(bot, file_name, files):
         poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
         language = files[0]["language"]
-
         quality_text = ""
         for file in files:
             q = file.get("jisshuquality") or file.get("quality") or "Unknown"
