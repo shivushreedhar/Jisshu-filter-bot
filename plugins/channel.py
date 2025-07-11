@@ -176,7 +176,7 @@ async def movie_name_format(file_name):
         .replace("'", "").replace("-", " ").replace("!", "")).strip()
 
 async def get_qualities(text):
-    qualities = ["480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip", "HDCAM", "WEB-DL", "PreDVD", "CAMRip", "DVDScr"]
+    qualities = ["480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip", "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS", "CAMRip", "DVDScr"]
     found = [q for q in qualities if q.lower() in text.lower()]
     return ", ".join(found) or "HDRip"
 
