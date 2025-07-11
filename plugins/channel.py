@@ -181,7 +181,7 @@ async def get_qualities(text):
     return ", ".join(found) or "HDRip"
 
 async def Jisshu_qualities(text, file_name):
-    qualities = ["360p", "480p", "540p", "576p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"]
+    qualities = ["360p", "400MB", "480p", "540p", "576p", "700MB", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"]
     text = (text + " " + file_name).lower()
     if "hevc" in text:
         for q in qualities:
