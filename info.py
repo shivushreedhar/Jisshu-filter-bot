@@ -33,10 +33,13 @@ USERNAME = environ.get("USERNAME", "SHREESHIVA323")  # ADMIN USERNAME
 
 # Database Channel
 CHANNELS = [
-    int(ch) if id_pattern.search(ch) else ch
-    for ch in environ.get("CHANNELS", "-1001714589113 -1002035953699 -1002888911184").split()
+    int(ch) for ch in environ.get(
+        "CHANNELS", "-1001714589113 -1002035953699 -1002888911184"
+    ).split()
 ]
 
+print(f"CHANNELS Loaded: {CHANNELS}")
+print(f"Types: {[type(ch) for ch in CHANNELS]}")
 # ForceSub Channel & Log Channels
 AUTH_CHANNEL = int(environ.get("AUTH_CHANNEL", "-1002088921495"))
 AUTH_REQ_CHANNEL = int(environ.get("AUTH_REQ_CHANNEL", "-1002668203148"))
