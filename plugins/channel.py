@@ -3,7 +3,6 @@ from typing import Optional
 from collections import defaultdict
 
 from pyrogram import Client, filters, enums
-
 from info import *
 from utils import *
 from database.ia_filterdb import save_file, unpack_new_file_id
@@ -86,16 +85,30 @@ async def send_movie_update(bot, file_name, files):
         quality_text = files[0]["quality"]
         year = files[0]["year"]
 
+        # Detect if Series or Movie
+        combined_mode = "combined" in file_name.lower()
+        is_series = combined_mode or bool(re.search(r"(?i)(S\d{1,2}|Season|Episode|E\d{1,2})", file_name))
+
         file_lines = ""
-        if len(files) == 1:
+
+        if not is_series:
+            # Movie Mode
+            file = files[0]
+            q = file.get("quality", "HDRip")
+            file_id = file["file_id"]
+            file_lines += f"<b>🎉 {q} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+
+        elif combined_mode or len(files) == 1:
+            # Combined Season Mode
             file = files[0]
             q = file.get("quality", "HDRip")
             file_id = file["file_id"]
             file_lines += f"<b>🎉 Complete Season :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+
         else:
+            # Series Mode (Episodes)
             ep_num = 1
             for file in files:
-                q = file.get("quality", "HDRip")
                 file_id = file["file_id"]
                 file_lines += f"<b>🎉 EPISODE {str(ep_num).zfill(2)} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
                 ep_num += 1
@@ -174,8 +187,8 @@ async def movie_name_format(file_name):
 
 async def get_qualities(text):
     qualities = ["400MB", "450MB", "480p", "700MB", "720p", "800MB",
-                 "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip", 
-                 "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS", 
+                 "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip",
+                 "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS",
                  "CAMRip", "DVDScr"]
     found = [q for q in qualities if q.lower() in text.lower()]
     return found[0] if found else "HDRip"
