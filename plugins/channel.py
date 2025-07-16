@@ -7,7 +7,6 @@ from info import *
 from utils import *
 from database.ia_filterdb import save_file, unpack_new_file_id
 
-
 LANGUAGE_KEYWORDS = {
     "kannada": "Kannada", "kan": "Kannada",
     "telugu": "Telugu", "tel": "Telugu",
@@ -20,11 +19,11 @@ LANGUAGE_KEYWORDS = {
     "gujarati": "Gujarati", "urdu": "Urdu"
 }
 
-
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
-POST_DELAY = 25
-processing_movies = set()
+grouping_timers = {}
+
+GROUPING_DELAY = 20  # seconds
 
 
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
@@ -45,7 +44,7 @@ async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
-        key = await simplify_title(file_name)
+        key = await simplify_title(file_name or caption)
 
         year = await extract_year(caption) or await extract_year(file_name) or "N/A"
         quality = await get_qualities(caption) or "HDRip"
@@ -63,64 +62,75 @@ async def queue_movie_file(bot, media):
             "year": year
         })
 
-        if key in processing_movies:
-            return
+        # Cancel existing timer for this key
+        if key in grouping_timers:
+            grouping_timers[key].cancel()
 
-        processing_movies.add(key)
-        await asyncio.sleep(POST_DELAY)
-
-        if key in movie_files:
-            await send_movie_update(bot, key, movie_files[key])
-            del movie_files[key]
-
-        processing_movies.remove(key)
+        # Start/reset timer
+        grouping_timers[key] = asyncio.create_task(wait_and_post(bot, key))
 
     except Exception as e:
-        processing_movies.discard(key)
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
 
 
-async def send_movie_update(bot, key, files):
+async def wait_and_post(bot, key):
     try:
-        poster = await fetch_movie_poster(key) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+        await asyncio.sleep(GROUPING_DELAY)
+        await send_movie_update(bot, key, movie_files[key])
+        del movie_files[key]
+        del grouping_timers[key]
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        await bot.send_message(LOG_CHANNEL, f"❌ wait_and_post error: {e}")
+
+
+async def send_movie_update(bot, file_name, files):
+    try:
+        poster = await fetch_movie_poster(file_name) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
         language = files[0]["language"]
         year = files[0]["year"]
 
-        combined_mode = "combined" in key.lower()
-        is_series = combined_mode or bool(re.search(r"(?i)(S\d{1,2}|Season|Episode|E\d{1,2})", key))
-        is_movie = not is_series and not combined_mode
+        combined_mode = "combined" in file_name.lower() or "complete season" in file_name.lower()
+        is_series = combined_mode or bool(re.search(r"(?i)(S\d{1,2}|Season|Episode|E\d{1,2})", file_name))
 
-        file_lines = ""
+        title_clean = file_name.strip()
 
-        if combined_mode:
+        if not is_series:
+            # 🎬 Movie Mode (multi-quality)
+            quality_dict = {}
+            for file in files:
+                q = file.get("quality", "HDRip")
+                quality_dict[q] = file["file_id"]
+
+            file_lines = ""
+            for quality, file_id in quality_dict.items():
+                file_lines += f"<b>🎬 {quality} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+
+        elif combined_mode or len(files) == 1:
+            # 📺 Combined Season
             file = files[0]
-            file_id = file["file_id"]
             q = file.get("quality", "HDRip")
-            file_lines += f"<b>🎉 Complete Season :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+            file_id = file["file_id"]
+            file_lines = f"<b>▶️ Complete Season [{q}] :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
 
-        elif is_series:
+        else:
+            # 📺 Series Episodes
+            file_lines = ""
             ep_num = 1
             for file in files:
                 file_id = file["file_id"]
-                q = file.get("quality", "HDRip")
                 file_lines += f"<b>🎉 EPISODE {str(ep_num).zfill(2)} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
                 ep_num += 1
 
-        elif is_movie:
-            # Group movie files by quality
-            for file in files:
-                q = file.get("quality", "HDRip")
-                file_id = file["file_id"]
-                file_lines += f"<b>🎉 {q} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
-
         caption = f"""<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
 
-<b>🎬 Title : {key} ({year})</b>
+<b>🎬 Title : {title_clean} ({year})</b>
 <b>🔊 Audio : {language}</b>
 
 <b>📥 Download Links :</b>
 
-<b>{file_lines}</b>
+{file_lines}
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
@@ -131,15 +141,12 @@ async def send_movie_update(bot, key, files):
         await bot.send_message(LOG_CHANNEL, f"❌ send_movie_update error: {e}")
 
 
-async def simplify_title(file_name):
-    name = await movie_name_format(file_name)
-    season_match = re.search(r"(?i)(S(\d{1,2})|Season\s?(\d{1,2}))", file_name)
-    if season_match:
-        season_number = season_match.group(2) or season_match.group(3)
-        base_title = re.split(r"S\d{1,2}|Season\s?\d{1,2}", name, maxsplit=1)[0].strip()
-        return f"{base_title} S{season_number}"
-    else:
-        return name.strip()
+async def simplify_title(text):
+    text = text.lower()
+    title = re.sub(r"(?i)(s\d{1,2}|season\s?\d{1,2}|e\d{1,2}|episode\s?\d{1,2}|combined|complete season)", "", text)
+    title = re.sub(r"[._\-]", " ", title)
+    title = re.sub(r"\s+", " ", title)
+    return title.strip().title()
 
 
 def detect_language(text):
