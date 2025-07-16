@@ -25,6 +25,7 @@ movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
 
+
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
     try:
@@ -38,14 +39,17 @@ async def media(bot, message):
     except Exception as e:
         await bot.send_message(LOG_CHANNEL, f"❌ media error: {e}")
 
+
 async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
         key = await simplify_title(file_name)
 
+        year = await extract_year(caption) or await extract_year(file_name) or "N/A"
         quality = await get_qualities(caption) or "HDRip"
         language = detect_language(f"{file_name} {caption}".lower())
+
         file_size_str = format_file_size(media.file_size)
         file_id, _ = unpack_new_file_id(media.file_id)
 
@@ -54,7 +58,8 @@ async def queue_movie_file(bot, media):
             "file_id": file_id,
             "file_size": file_size_str,
             "caption": caption,
-            "language": language
+            "language": language,
+            "year": year
         })
 
         if key in processing_movies:
@@ -73,35 +78,35 @@ async def queue_movie_file(bot, media):
         processing_movies.discard(key)
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
 
+
 async def send_movie_update(bot, file_name, files):
     try:
         poster = await fetch_movie_poster(file_name) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
         language = files[0]["language"]
         quality_text = files[0]["quality"]
+        year = files[0]["year"]
 
-        is_series = "S" in file_name.upper() and any(char.isdigit() for char in file_name)
         file_lines = ""
-
-        if is_series:
+        if len(files) == 1:
+            file = files[0]
+            q = file.get("quality", "HDRip")
+            file_id = file["file_id"]
+            file_lines += f"▶️ Complete Season [{q}] : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+        else:
             ep_num = 1
             for file in files:
                 q = file.get("quality", "HDRip")
                 file_id = file["file_id"]
                 file_lines += f"▶️ EPISODE {str(ep_num).zfill(2)} [{q}] : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
                 ep_num += 1
-        else:
-            for file in files:
-                q = file.get("quality", "HDRip")
-                file_id = file["file_id"]
-                file_lines += f"▶️ {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
 
         caption = f"""<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
 
-<b>🎬 Title : {file_name} (N/A)</b>
+<b>🎬 Title : {file_name} ({year})</b>
 <b>🛠️ Available In : {quality_text}</b>
 <b>🔊 Audio : {language}</b>
 
-<b>📥 {"Episodes" if is_series else "Download Links"} :</b>
+<b>📥 Download Links :</b>
 
 {file_lines}
 
@@ -113,6 +118,7 @@ async def send_movie_update(bot, file_name, files):
     except Exception as e:
         await bot.send_message(LOG_CHANNEL, f"❌ send_movie_update error: {e}")
 
+
 async def simplify_title(file_name):
     name = await movie_name_format(file_name)
     season_match = re.search(r"(?i)(S(\d{1,2})|Season\s?(\d{1,2}))", file_name)
@@ -123,12 +129,14 @@ async def simplify_title(file_name):
     else:
         return name.strip()
 
+
 def detect_language(text):
     found_langs = set()
     for k, lang in LANGUAGE_KEYWORDS.items():
         if re.search(rf"\b{k}\b", text):
             found_langs.add(lang)
     return ", ".join(sorted(found_langs)) if found_langs else "English"
+
 
 async def fetch_movie_poster(title: str) -> Optional[str]:
     try:
@@ -147,12 +155,14 @@ async def fetch_movie_poster(title: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def format_file_size(size_bytes):
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_bytes < 1024:
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024
     return f"{size_bytes:.2f} PB"
+
 
 async def movie_name_format(file_name):
     return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
@@ -161,10 +171,17 @@ async def movie_name_format(file_name):
         .replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
         .replace("'", "").replace("-", " ").replace("!", "")).strip()
 
+
 async def get_qualities(text):
     qualities = ["400MB", "450MB", "480p", "700MB", "720p", "800MB",
-                 "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip",
-                 "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS", "CAMRip", "DVDScr"]
+                 "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip", 
+                 "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS", 
+                 "CAMRip", "DVDScr"]
     found = [q for q in qualities if q.lower() in text.lower()]
     return found[0] if found else "HDRip"
+
+
+async def extract_year(text):
+    match = re.search(r"\b(19|20)\d{2}\b", text)
+    return match.group(0) if match else None
     
