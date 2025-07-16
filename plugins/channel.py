@@ -20,18 +20,6 @@ LANGUAGE_KEYWORDS = {
     "gujarati": "Gujarati", "urdu": "Urdu"
 }
 
-UPDATE_CAPTION = """<b><blockquote>TRENDING 𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote></b>
-
-🎬 <b>Title : {} {}</b>
-🔰 <b>Quality : {}</b>
-🎧 <b>Audio : {}</b>
-
-<b>✨ Telegram Files ✨</b>
-
-{}
-
-<b><blockquote>〽️ Powered by @BSHEGDE5</blockquote></b>"""
-
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
 POST_DELAY = 25
@@ -60,7 +48,6 @@ async def queue_movie_file(bot, media):
 
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption) or re.search(r"(?i)(?:s|season)0*(\d{1,2})", file_name)
 
-        # Use key for grouping
         if year and year in file_name:
             key = file_name[: file_name.find(year) + 4]
         elif season_match:
@@ -77,7 +64,7 @@ async def queue_movie_file(bot, media):
         for k, lang in LANGUAGE_KEYWORDS.items():
             if re.search(rf"\b{k}\b", text):
                 found_langs.add(lang)
-        language = ", ".join(sorted(found_langs)) if found_langs else "Not Identified"
+        language = ", ".join(sorted(found_langs)) if found_langs else "English"
 
         file_size_str = format_file_size(media.file_size)
         file_id, file_ref = unpack_new_file_id(media.file_id)
@@ -113,19 +100,47 @@ async def send_movie_update(bot, file_name, files):
         imdb_data = await get_imdb(file_name)
         title = imdb_data.get("title", file_name)
         kind = imdb_data.get("kind", "").strip().upper().replace(" ", "_")
-        kind = "SERIES" if kind == "TV_SERIES" else kind
+        kind = "SERIES" if kind == "TV_SERIES" else "MOVIE"
         year = imdb_data.get("year", files[0]["year"])
         poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
         language = files[0]["language"]
-        quality_text = ""
-        for file in files:
-            q = file.get("jisshuquality") or file.get("quality") or "Unknown"
-            size = file["file_size"]
-            file_id = file["file_id"]
-            quality_text += f"📦 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
+        qualities = sorted(set(file["jisshuquality"] or file["quality"] for file in files))
+        quality_text = ", ".join(qualities)
 
-        caption = UPDATE_CAPTION.format(kind, title, year, files[0]["quality"], language, quality_text)
+        file_lines = ""
+        if kind == "SERIES":
+            ep_num = 1
+            if len(files) == 1:
+                file = files[0]
+                q = file.get("jisshuquality") or file.get("quality")
+                file_id = file["file_id"]
+                file_lines += f"▶️ Complete Season [{q}] : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+            else:
+                for file in files:
+                    q = file.get("jisshuquality") or file.get("quality")
+                    file_id = file["file_id"]
+                    file_lines += f"▶️ Episode {str(ep_num).zfill(2)} [{q}] : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+                    ep_num += 1
+        else:
+            for file in files:
+                q = file.get("jisshuquality") or file.get("quality")
+                file_id = file["file_id"]
+                file_lines += f"▶️ {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+
+        caption = f"""<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
+
+<b>🎬 {title} ({year})</b>
+<b>🛠️ Available In :</b> {quality_text}
+<b>🔊 Audio :</b> {language}
+
+<b>📥 {"Episodes" if kind == "SERIES" else "Download Links"} :</b>
+
+{file_lines}
+
+<blockquote><b>🚀 Download and Dive In!</b></blockquote>
+<blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
+
         await bot.send_photo(chat_id=MOVIE_UPDATE_CHANNEL, photo=poster, caption=caption, parse_mode=enums.ParseMode.HTML)
 
     except Exception as e:
@@ -169,7 +184,7 @@ def format_file_size(size_bytes):
     return f"{size_bytes:.2f} PB"
 
 async def movie_name_format(file_name):
-    return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
+    return re.sub(r"http\\S+", "", re.sub(r"@\\w+|#\\w+", "", file_name)
         .replace("_", " ").replace("[", "").replace("]", "")
         .replace("(", "").replace(")", "").replace("{", "").replace("}", "")
         .replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
