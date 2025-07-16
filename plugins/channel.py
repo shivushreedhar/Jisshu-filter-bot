@@ -1,11 +1,12 @@
 import re, asyncio, aiohttp
 from typing import Optional
 from collections import defaultdict
-from pyrogram import Client, filters, enums
 
+from pyrogram import Client, filters, enums
 from info import *
 from utils import *
 from database.ia_filterdb import save_file, unpack_new_file_id
+
 
 LANGUAGE_KEYWORDS = {
     "kannada": "Kannada", "kan": "Kannada",
@@ -18,6 +19,7 @@ LANGUAGE_KEYWORDS = {
     "marathi": "Marathi", "punjabi": "Punjabi",
     "gujarati": "Gujarati", "urdu": "Urdu"
 }
+
 
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
@@ -41,8 +43,8 @@ async def media(bot, message):
 
 async def queue_movie_file(bot, media):
     try:
-        file_name = await clean_title(media.file_name)
-        caption = await clean_title(media.caption or "")
+        file_name = await movie_name_format(media.file_name)
+        caption = await movie_name_format(media.caption or "")
         key = await simplify_title(file_name)
 
         year = await extract_year(caption) or await extract_year(file_name) or "N/A"
@@ -78,46 +80,47 @@ async def queue_movie_file(bot, media):
         await bot.send_message(LOG_CHANNEL, f"❌ queue_movie_file error: {e}")
 
 
-async def send_movie_update(bot, file_name, files):
+async def send_movie_update(bot, key, files):
     try:
-        poster = await fetch_movie_poster(file_name) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+        poster = await fetch_movie_poster(key) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
         language = files[0]["language"]
-        quality_text = files[0]["quality"]
         year = files[0]["year"]
 
-        combined_mode = "combined" in file_name.lower()
-        is_series = combined_mode or len(files) > 1
+        combined_mode = "combined" in key.lower()
+        is_series = combined_mode or bool(re.search(r"(?i)(S\d{1,2}|Season|Episode|E\d{1,2})", key))
+        is_movie = not is_series and not combined_mode
 
         file_lines = ""
 
-        if not is_series:
+        if combined_mode:
             file = files[0]
-            q = file.get("quality", "HDRip")
             file_id = file["file_id"]
-            file_lines += f"<b>🎉 [{q}] :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
-
-        elif combined_mode or len(files) == 1:
-            file = files[0]
             q = file.get("quality", "HDRip")
-            file_id = file["file_id"]
             file_lines += f"<b>🎉 Complete Season :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
 
-        else:
+        elif is_series:
             ep_num = 1
             for file in files:
                 file_id = file["file_id"]
+                q = file.get("quality", "HDRip")
                 file_lines += f"<b>🎉 EPISODE {str(ep_num).zfill(2)} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
                 ep_num += 1
 
+        elif is_movie:
+            # Group movie files by quality
+            for file in files:
+                q = file.get("quality", "HDRip")
+                file_id = file["file_id"]
+                file_lines += f"<b>🎉 {q} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+
         caption = f"""<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
 
-<b>🎬 Title : {file_name} ({year})</b>
-<b>🛠️ Available In : {quality_text}</b>
+<b>🎬 Title : {key} ({year})</b>
 <b>🔊 Audio : {language}</b>
 
 <b>📥 Download Links :</b>
 
-{file_lines}
+<b>{file_lines}</b>
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
@@ -129,20 +132,14 @@ async def send_movie_update(bot, file_name, files):
 
 
 async def simplify_title(file_name):
-    name = await clean_title(file_name)
-    name = re.sub(r"(S\d{1,2}|Season\s?\d{1,2}|E\d{1,2}|Episode\s?\d{1,2}|Complete\s?Season|Combined|\b480p\b|\b720p\b|\b1080p\b|HDRip|WEB-DL|HDCAM|DVDScr|HEVC)", "", name, flags=re.I)
-    return re.sub(r"\s+", " ", name).strip()
-
-
-async def clean_title(text):
-    if not text:
-        return ""
-    return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", text)
-        .replace("_", " ").replace("[", "").replace("]", "")
-        .replace("(", "").replace(")", "").replace("{", "").replace("}", "")
-        .replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
-        .replace("'", "").replace("-", " ").replace("!", "")
-        ).strip()
+    name = await movie_name_format(file_name)
+    season_match = re.search(r"(?i)(S(\d{1,2})|Season\s?(\d{1,2}))", file_name)
+    if season_match:
+        season_number = season_match.group(2) or season_match.group(3)
+        base_title = re.split(r"S\d{1,2}|Season\s?\d{1,2}", name, maxsplit=1)[0].strip()
+        return f"{base_title} S{season_number}"
+    else:
+        return name.strip()
 
 
 def detect_language(text):
@@ -177,6 +174,14 @@ def format_file_size(size_bytes):
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024
     return f"{size_bytes:.2f} PB"
+
+
+async def movie_name_format(file_name):
+    return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
+        .replace("_", " ").replace("[", "").replace("]", "")
+        .replace("(", "").replace(")", "").replace("{", "").replace("}", "")
+        .replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
+        .replace("'", "").replace("-", " ").replace("!", "")).strip()
 
 
 async def get_qualities(text):
