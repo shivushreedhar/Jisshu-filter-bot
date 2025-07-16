@@ -91,13 +91,13 @@ async def send_movie_update(bot, file_name, files):
             file = files[0]
             q = file.get("quality", "HDRip")
             file_id = file["file_id"]
-            file_lines += f"🎉 Complete Season : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+            file_lines += f"<b>🎉 Complete Season :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
         else:
             ep_num = 1
             for file in files:
                 q = file.get("quality", "HDRip")
                 file_id = file["file_id"]
-                file_lines += f"🎉 EPISODE {str(ep_num).zfill(2)} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+                file_lines += f"<b>🎉 EPISODE {str(ep_num).zfill(2)} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
                 ep_num += 1
 
         caption = f"""<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
@@ -108,7 +108,7 @@ async def send_movie_update(bot, file_name, files):
 
 <b>📥 Download Links :</b>
 
-{file_lines}
+<b>{file_lines}</b>
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
