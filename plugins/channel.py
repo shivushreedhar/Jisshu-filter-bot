@@ -1,18 +1,16 @@
-# --| This code created by: Jisshu_bots & SilentXBotz |--
-
 import re
 import asyncio
-import aiohttp
 from collections import defaultdict
 from typing import Optional
+import aiohttp
 
-from info import MOVIE_UPDATE_CHANNEL, LOG_CHANNEL
-from utils import get_poster, temp
 from pyrogram import Client, filters, enums
-from database.users_chats_db import db
+from info import MOVIE_UPDATE_CHANNEL, CHANNELS, LOG_CHANNEL
+from utils import get_poster, temp
 from database.ia_filterdb import save_file, unpack_new_file_id
+from database.users_chats_db import db
 
-# Language Keywords Extended
+# Language Keywords
 CAPTION_LANGUAGES = [
     "Bhojpuri", "bho", "bhojp", "Hindi", "hin", "hindi",
     "Bengali", "ben", "bengali", "Bangla", "bangla", "bang", "Tamil", "tam", "tamil",
@@ -28,7 +26,7 @@ CAPTION_LANGUAGES = [
     "Assamese", "ass", "assamese", "Urdu", "urd", "urdu"
 ]
 
-UPDATE_CAPTION = """<b><blockquote>🎉 Streaming Now 🎉</b></blockquote>
+UPDATE_CAPTION = """<b><blockquote>🎉 Streaming Now 🎉</blockquote></b>
 
 <b>🎬 Title : {} {}</b>
 <b>🛠️ Available in : {} </b>
@@ -48,18 +46,15 @@ POST_DELAY = 25
 processing_movies = set()
 media_filter = filters.document | filters.video | filters.audio
 
-
-@Client.on_message(filters.channel & media_filter)
+@Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
-    bot_id = bot.me.id
     media = getattr(message, message.media.value, None)
-    if media and media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
+    if media:
         media.file_type = message.media.value
         media.caption = message.caption
         save_status = await save_file(media)
-        if save_status == "suc" and await db.get_send_movie_update_status(bot_id):
+        if save_status == "suc":
             await queue_movie_file(bot, media)
-
 
 async def queue_movie_file(bot, media):
     try:
@@ -68,7 +63,6 @@ async def queue_movie_file(bot, media):
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption)
-
         if year:
             file_name = file_name[: file_name.find(year) + 4]
         elif season_match:
@@ -91,8 +85,6 @@ async def queue_movie_file(bot, media):
             "year": year
         })
 
-        print(f"[Koyeb Log] ➜ New file queued: {file_name}. Reset 25s timer.")
-
         if file_name in processing_movies:
             return
         processing_movies.add(file_name)
@@ -107,8 +99,7 @@ async def queue_movie_file(bot, media):
 
     except Exception as e:
         processing_movies.discard(file_name)
-        await bot.send_message(LOG_CHANNEL, f"[Koyeb Log] ❌ Error in queue_movie_file: {e}")
-
+        await bot.send_message(LOG_CHANNEL, f"[LOG] Error in queue_movie_file: {e}")
 
 async def send_movie_update(bot, file_name, files):
     try:
@@ -118,9 +109,7 @@ async def send_movie_update(bot, file_name, files):
 
         imdb_data = await get_imdb(file_name)
         title = imdb_data.get("title", file_name)
-        kind = imdb_data.get("kind", "").upper().replace(" ", "_")
-        kind = "SERIES" if kind == "TV_SERIES" else "MOVIE"
-
+        kind = imdb_data.get("kind", "Movie").upper()
         year = files[0].get("year", "")
         poster = await fetch_movie_poster(title, year)
         language = ", ".join({f["language"] for f in files if f["language"] != "Unknown"}) or "Unknown"
@@ -133,11 +122,6 @@ async def send_movie_update(bot, file_name, files):
 
         full_caption = UPDATE_CAPTION.format(kind, title, year or "", files[0]["quality"], language, quality_text)
 
-        if len(full_caption) > 1000:
-            full_caption = full_caption[:1000] + "..."
-
-        print(f"[Koyeb Log] ➜ Sending {file_name} to MCU {MOVIE_UPDATE_CHANNEL}")
-
         await bot.send_photo(
             chat_id=MOVIE_UPDATE_CHANNEL,
             photo=poster or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg",
@@ -145,30 +129,23 @@ async def send_movie_update(bot, file_name, files):
             parse_mode=enums.ParseMode.HTML
         )
 
-        print(f"[Koyeb Log] ✅ Posted: {file_name}")
-
     except Exception as e:
-        await bot.send_message(LOG_CHANNEL, f"[Koyeb Log] ❌ Post error for {file_name}: {e}")
-        print(f"[Koyeb Log] ❌ Post error for {file_name}: {e}")
+        await bot.send_message(LOG_CHANNEL, f"[LOG] Error in send_movie_update for {file_name}: {e}")
 
-
-# ---------- UTILITIES ----------
+# ---------- UTILITIES -----------
 
 async def get_imdb(file_name):
     try:
         formatted_name = await movie_name_format(file_name)
         imdb = await get_poster(formatted_name)
-        if not imdb:
-            return {}
         return {
             "title": imdb.get("title", formatted_name),
             "kind": imdb.get("kind", "Movie"),
             "year": imdb.get("year"),
             "url": imdb.get("url"),
-        }
+        } if imdb else {}
     except Exception:
         return {}
-
 
 async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional[str]:
     async with aiohttp.ClientSession() as session:
@@ -181,12 +158,11 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
                 data = await res.json()
                 for key in ["jisshu-2", "jisshu-3", "jisshu-4"]:
                     posters = data.get(key)
-                    if posters and isinstance(posters, list) and posters:
+                    if posters and isinstance(posters, list):
                         return posters[0]
                 return None
         except Exception:
             return None
-
 
 async def get_qualities(text):
     qualities = [
@@ -197,7 +173,6 @@ async def get_qualities(text):
     found_qualities = [q for q in qualities if q.lower() in text.lower()]
     return ", ".join(found_qualities) or "HDRip"
 
-
 async def Jisshu_qualities(text, file_name):
     qualities = ["480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"]
     combined_text = (text.lower() + " " + file_name.lower()).strip()
@@ -205,7 +180,6 @@ async def Jisshu_qualities(text, file_name):
         if quality.lower() in combined_text:
             return quality
     return "720p"
-
 
 async def movie_name_format(file_name):
     filename = re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
@@ -215,7 +189,6 @@ async def movie_name_format(file_name):
         .replace("'", "").replace("-", "").replace("!", "")
     ).strip()
     return filename
-
 
 def format_file_size(size_bytes):
     for unit in ["B", "KB", "MB", "GB", "TB"]:
