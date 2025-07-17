@@ -12,7 +12,6 @@ from utils import *
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
 
-
 LANGUAGE_KEYWORDS = {
     "tam": "Tamil", "tamil": "Tamil",
     "tel": "Telugu", "telugu": "Telugu",
@@ -23,6 +22,8 @@ LANGUAGE_KEYWORDS = {
     "ben": "Bengali", "bengali": "Bengali",
     "pun": "Punjabi", "punjabi": "Punjabi"
 }
+
+PRINT_TYPES = ["HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr"]
 
 CAPTION_LANGUAGES = list(set(LANGUAGE_KEYWORDS.values()))
 
@@ -127,11 +128,18 @@ async def send_movie_update(bot, file_name, files):
         poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
         languages = set()
+        print_types = set()
+
         for file in files:
             if file["language"] != "Unknown":
                 languages.update(file["language"].split(", "))
+            for p in PRINT_TYPES:
+                if p.lower() in (file["quality"] or "").lower():
+                    print_types.add(p)
 
         language = ", ".join(sorted(languages)) or "Unknown"
+        available_in = ", ".join(sorted(print_types)) or "HDRip"
+
         files.sort(key=lambda x: x.get("episode") or 0)
 
         quality_text = ""
@@ -147,13 +155,11 @@ async def send_movie_update(bot, file_name, files):
                 quality_text += f"🎉 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         kind_name = "SERIES" if is_series else "MOVIE"
-        print_type = files[0]["quality"] or "HDRip"
-
         caption = UPDATE_CAPTION.format(
             kind_name,
             title,
             year,
-            print_type,
+            available_in,
             language,
             quality_text
         )
@@ -234,11 +240,10 @@ async def movie_name_format(file_name):
 
 async def get_qualities(text):
     qualities = [
-        "HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr",
         "480p", "400MB", "700MB", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"
     ]
     found = [q for q in qualities if q.lower() in text.lower()]
-    return ", ".join([q for q in found if q in ["HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr"]]) or "HDRip"
+    return ", ".join(found) or "720p"
 
 
 def detect_languages(text):
