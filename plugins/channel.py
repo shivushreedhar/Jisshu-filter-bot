@@ -1,6 +1,4 @@
-import re
-import asyncio
-import aiohttp
+import re, asyncio, aiohttp
 from collections import defaultdict
 from typing import Optional
 
@@ -10,6 +8,7 @@ from utils import temp
 from database.ia_filterdb import save_file, unpack_new_file_id
 
 media_filter = filters.document | filters.video | filters.audio
+
 movie_files = defaultdict(list)
 waiting_tasks = dict()
 POST_DELAY = 25
@@ -28,34 +27,33 @@ LANGUAGE_KEYWORDS = {
 
 
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
-async def media(bot, message):
+async def media_handler(bot, message):
     media_obj = getattr(message, message.media.value, None)
-    if not media_obj:
-        print("No media object found.")
+    if not media_obj or media_obj.mime_type not in ["video/mp4", "video/x-matroska", "document/mp4"]:
         return
 
-    await save_file(media_obj)
-    print(f"@{message.from_user.username} - {media_obj.file_name} is saved to database")
-
+    await save_file(media_obj)  # Saves to DB
     file_name = await movie_name_format(media_obj.file_name or "")
+    caption_text = await movie_name_format(message.caption or "")
+
     title_key = await simplify_title(file_name)
-
-    file_size = format_file_size(media_obj.file_size)
     file_id, _ = unpack_new_file_id(media_obj.file_id)
+    file_size = format_file_size(media_obj.file_size)
 
-    language = detect_language(file_name.lower())
-    quality = await get_qualities(file_name)
-    year = await extract_year(file_name) or "N/A"
+    language = detect_language(f"{file_name} {caption_text}".lower())
+    quality = await get_qualities(f"{file_name} {caption_text}")
+    year = await extract_year(f"{file_name} {caption_text}") or "N/A"
 
     movie_files[title_key].append({
         "file_id": file_id,
         "file_size": file_size,
         "quality": quality,
         "language": language,
-        "year": year
+        "year": year,
+        "caption": caption_text
     })
 
-    print(f"[{title_key}] ➕ File added to DB ({quality}, {file_size})")
+    print(f"[{title_key}] ➕ File Added ({quality}, {file_size})")
 
     if title_key in waiting_tasks:
         waiting_tasks[title_key].cancel()
@@ -65,16 +63,11 @@ async def media(bot, message):
 
 async def wait_and_post(bot, key):
     try:
-        remaining = POST_DELAY
-        print(f"[{key}] New file detected. Timer reset.")
-        while remaining > 0:
-            print(f"[{key}] Waiting for file {remaining} sec...")
-            await asyncio.sleep(1)
-            remaining -= 1
+        print(f"[{key}] Waiting {POST_DELAY}s for grouping files...")
+        await asyncio.sleep(POST_DELAY)
 
-        print(f"[{key}] No file came. Sending post to MUC...")
+        print(f"[{key}] Time over. Posting now.")
         await send_movie_update(bot, key, movie_files[key])
-        print(f"[{key}] ✅ Post sent to MUC.")
 
         del movie_files[key]
         del waiting_tasks[key]
@@ -88,27 +81,30 @@ async def wait_and_post(bot, key):
 async def send_movie_update(bot, title_key, files):
     poster = await fetch_movie_poster(title_key) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-    file_lines = ""
-    qualities_present = []
     year = files[0].get("year", "N/A")
     language = files[0].get("language", "Unknown")
+
+    combined_caption = ""
+    qualities_present = []
+
+    kind = "SERIES" if is_series(title_key + files[0]['caption']) else "MOVIE"
 
     for file in files:
         q = file.get("quality", "HDRip")
         qualities_present.append(q)
         link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
-        file_lines += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
+        combined_caption += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
 
     caption = f"""
 <blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
 
 <b>🎬 Title : {title_key} ({year})</b>
-<b>🛠️ Available In : {', '.join(sorted(set(qualities_present)))}</b>
+<b>🔰 Available In : {', '.join(sorted(set(qualities_present)))}</b>
 <b>🔊 Audio : {language}</b>
 
 <b>📥 Download Links :</b>
 
-<b>{file_lines}</b>
+<b>{combined_caption}</b>
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>
@@ -120,6 +116,10 @@ async def send_movie_update(bot, title_key, files):
         caption=caption,
         parse_mode=enums.ParseMode.HTML
     )
+
+
+def is_series(text):
+    return bool(re.search(r"(?i)(S\d{1,2}E\d{1,2})|(Season\s?\d+)|(Episode\s?\d+)", text))
 
 
 async def simplify_title(text):
