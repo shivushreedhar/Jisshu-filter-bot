@@ -1,12 +1,9 @@
 import re
 import asyncio
 import aiohttp
-
 from typing import Optional
 from collections import defaultdict
-
 from pyrogram import Client, filters, enums
-
 from info import *
 from utils import *
 from database.users_chats_db import db
@@ -58,6 +55,7 @@ async def media(bot, message):
             print(f"✅ File saved status: {status}")
             if status == "suc":
                 await queue_movie_file(bot, media)
+
     except Exception as e:
         print(f"❌ Error in media: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ media error: {e}")
@@ -75,14 +73,15 @@ async def queue_movie_file(bot, media):
                        or re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", file_name)
         season_tag = f" Season {season_match.group(1)}" if season_match else ""
 
-        group_key = (file_name + season_tag).strip()
+        group_key = (file_name.split(' ')[0] + season_tag).strip()
+
+        print(f"🔗 Grouping under: {group_key}")
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
         language = detect_languages(caption) or "Unknown"
         file_size_str = format_file_size(media.file_size)
         file_id, _ = unpack_new_file_id(media.file_id)
-
         episode = extract_episode_number(file_name + caption)
 
         movie_files[group_key].append({
@@ -216,14 +215,10 @@ def format_file_size(size_bytes):
 
 async def movie_name_format(file_name):
     return re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
-        .replace("_", " ")
-        .replace("[", "").replace("]", "")
-        .replace("(", "").replace(")", "")
-        .replace("{", "").replace("}", "")
-        .replace(".", " ").replace("@", "")
-        .replace(":", "").replace(";", "")
-        .replace("'", "").replace("-", "")
-        .replace("!", "")).strip()
+        .replace("_", " ").replace("[", "").replace("]", "")
+        .replace("(", "").replace(")", "").replace("{", "").replace("}", "")
+        .replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
+        .replace("'", "").replace("-", " ").replace("!", "")).strip()
 
 
 async def get_qualities(text):
