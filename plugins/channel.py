@@ -1,8 +1,8 @@
-# --| This code created by: Jisshu_bots & SilentXBotz |--#
+# --| This code created by: Jisshu_bots & SilentXBotz |--# 
 import re
 import hashlib
 import asyncio
-from info import *
+from info import MOVIE_UPDATE_CHANNEL, LOG_CHANNEL
 from utils import *
 from pyrogram import Client, filters, enums
 from database.users_chats_db import db
@@ -14,17 +14,17 @@ from collections import defaultdict
 # Language Keywords Extended
 CAPTION_LANGUAGES = [
     "Bhojpuri", "bho", "bhojp", "Hindi", "hin", "hindi",
-    "Bengali", "ben", "bengali", "Bangla", "bangla", "bang", "Tamil", "tam", "tamil",
-    "English", "eng", "english", "Telugu", "tel", "telugu",
-    "Malayalam", "mal", "malayalam", "Kannada", "kan", "kannada",
-    "Marathi", "mar", "marathi", "Punjabi", "pun", "punjabi",
-    "Bengoli", "beng", "bengoli", "Gujrati", "guj", "gujrati", "gujarati",
-    "Korean", "kor", "korean", "Spanish", "spa", "spanish",
-    "French", "fre", "french", "German", "ger", "german",
-    "Chinese", "chi", "chinese", "Arabic", "ara", "arabic",
-    "Portuguese", "por", "portuguese", "Russian", "rus", "russian",
-    "Japanese", "jap", "japanese", "Odia", "ori", "odia",
-    "Assamese", "ass", "assamese", "Urdu", "urd", "urdu"
+    "Bengali", "ben", "bengali", "Bangla", "bangla", "bang",
+    "Tamil", "tam", "tamil", "English", "eng", "english",
+    "Telugu", "tel", "telugu", "Malayalam", "mal", "malayalam",
+    "Kannada", "kan", "kannada", "Marathi", "mar", "marathi",
+    "Punjabi", "pun", "punjabi", "Bengoli", "beng", "bengoli",
+    "Gujrati", "guj", "gujrati", "gujarati", "Korean", "kor", "korean",
+    "Spanish", "spa", "spanish", "French", "fre", "french",
+    "German", "ger", "german", "Chinese", "chi", "chinese",
+    "Arabic", "ara", "arabic", "Portuguese", "por", "portuguese",
+    "Russian", "rus", "russian", "Japanese", "jap", "japanese",
+    "Odia", "ori", "odia", "Assamese", "ass", "assamese", "Urdu", "urd", "urdu"
 ]
 
 UPDATE_CAPTION = """<b><blockquote>🎉 Streaming Now 🎉</b></blockquote>
@@ -137,9 +137,8 @@ async def send_movie_update(bot, file_name, files):
 
         full_caption = UPDATE_CAPTION.format(kind, title, year or "", files[0]["quality"], language, quality_text)
 
-        movie_update_channel = await db.movies_update_channel_id()
         await bot.send_photo(
-            chat_id=movie_update_channel or MOVIE_UPDATE_CHANNEL,
+            chat_id=MOVIE_UPDATE_CHANNEL,  # <-- Forced usage of your MUC ID from info.py
             photo=poster or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg",
             caption=full_caption,
             parse_mode=enums.ParseMode.HTML
@@ -167,6 +166,7 @@ async def get_imdb(file_name):
     except Exception:
         return {}
 
+
 async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional[str]:
     async with aiohttp.ClientSession() as session:
         query = title.strip().replace(" ", "+")
@@ -184,13 +184,16 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
         except Exception:
             return None
 
+
 async def get_qualities(text):
     qualities = [
         "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
-        "ORG", "org", "HDRip", "hdrip", "CAMRip", "camrip", "WEB-DL", "hdtc", "predvd", "dvdscr", "dvdrip", "HDTS", "hdts"
+        "ORG", "org", "HDRip", "hdrip", "CAMRip", "camrip",
+        "WEB-DL", "hdtc", "predvd", "dvdscr", "dvdrip", "HDTS", "hdts"
     ]
     found_qualities = [q for q in qualities if q.lower() in text.lower()]
     return ", ".join(found_qualities) or "HDRip"
+
 
 async def Jisshu_qualities(text, file_name):
     qualities = ["480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"]
@@ -199,6 +202,7 @@ async def Jisshu_qualities(text, file_name):
         if quality.lower() in combined_text:
             return quality
     return "720p"
+
 
 async def movie_name_format(file_name):
     filename = re.sub(r"http\S+", "", re.sub(r"@\w+|#\w+", "", file_name)
@@ -209,10 +213,11 @@ async def movie_name_format(file_name):
     ).strip()
     return filename
 
+
 def format_file_size(size_bytes):
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_bytes < 1024:
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024
     return f"{size_bytes:.2f} PB"
-                      
+    
