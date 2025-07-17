@@ -40,6 +40,7 @@ UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
 media_filter = filters.document | filters.video | filters.audio
+
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
@@ -73,7 +74,7 @@ async def queue_movie_file(bot, media):
         year = year_match.group(0) if year_match else None
 
         season_match = re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", caption) \
-                       or re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", file_name)
+                    or re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", file_name)
         season_tag = f" Season {season_match.group(1)}" if season_match else ""
 
         group_key = (file_name.split(' ')[0] + season_tag).strip()
@@ -146,11 +147,13 @@ async def send_movie_update(bot, file_name, files):
                 quality_text += f"🎉 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         kind_name = "SERIES" if is_series else "MOVIE"
+        print_type = files[0]["quality"] or "HDRip"
+
         caption = UPDATE_CAPTION.format(
             kind_name,
             title,
             year,
-            files[0]["jisshuquality"],
+            print_type,
             language,
             quality_text
         )
@@ -231,11 +234,11 @@ async def movie_name_format(file_name):
 
 async def get_qualities(text):
     qualities = [
-        "480p", "400MB", "700MB", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
-        "HDRip", "HDCAM", "WEB-DL", "PreDVD", "CAMRip", "DVDScr"
+        "HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr",
+        "480p", "400MB", "700MB", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"
     ]
     found = [q for q in qualities if q.lower() in text.lower()]
-    return ", ".join(found) or "720p"
+    return ", ".join([q for q in found if q in ["HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr"]]) or "HDRip"
 
 
 def detect_languages(text):
