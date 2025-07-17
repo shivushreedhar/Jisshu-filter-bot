@@ -10,22 +10,14 @@ from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
 
 LANGUAGE_KEYWORDS = {
-    "tam": "Tamil",
-    "tamil": "Tamil",
-    "tel": "Telugu",
-    "telugu": "Telugu",
-    "kan": "Kannada",
-    "kannada": "Kannada",
-    "mal": "Malayalam",
-    "malayalam": "Malayalam",
-    "hin": "Hindi",
-    "hindi": "Hindi",
-    "eng": "English",
-    "english": "English",
-    "ben": "Bengali",
-    "bengali": "Bengali",
-    "pun": "Punjabi",
-    "punjabi": "Punjabi"
+    "tam": "Tamil", "tamil": "Tamil",
+    "tel": "Telugu", "telugu": "Telugu",
+    "kan": "Kannada", "kannada": "Kannada",
+    "mal": "Malayalam", "malayalam": "Malayalam",
+    "hin": "Hindi", "hindi": "Hindi",
+    "eng": "English", "english": "English",
+    "ben": "Bengali", "bengali": "Bengali",
+    "pun": "Punjabi", "punjabi": "Punjabi"
 }
 
 CAPTION_LANGUAGES = list(set(LANGUAGE_KEYWORDS.values()))
@@ -53,6 +45,7 @@ async def media(bot, message):
     try:
         print(f"📥 File received in DB channel: {message.chat.id}")
         media = getattr(message, message.media.value, None)
+
         if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
             media.file_type = message.media.value
             media.caption = message.caption
@@ -71,6 +64,7 @@ async def queue_movie_file(bot, media):
         caption = await movie_name_format(media.caption or "")
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
+
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption) or re.search(r"(?i)(?:s|season)0*(\d{1,2})", file_name)
         if year:
             file_name = file_name[: file_name.find(year) + 4]
@@ -114,17 +108,6 @@ async def queue_movie_file(bot, media):
 
 async def send_movie_update(bot, file_name, files):
     try:
-        muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
-
-        # Validate MUC id before posting
-        if isinstance(muc_id, int):
-            try:
-                await bot.get_chat(muc_id)
-            except Exception as e:
-                print(f"⚠️ Invalid or inaccessible MUC channel: {e}")
-                await bot.send_message(LOG_CHANNEL, f"⚠️ MUC Channel inaccessible: {e}")
-                return
-
         imdb_data = await get_imdb(file_name)
         title = imdb_data.get("title", file_name)
         kind = imdb_data.get("kind", "").strip().upper().replace(" ", "_")
@@ -149,6 +132,16 @@ async def send_movie_update(bot, file_name, files):
             quality_text += f"📦 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         caption = UPDATE_CAPTION.format(kind, title, year, files[0]["quality"], language, quality_text)
+        muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
+
+        # ✅ Peer ID avoidance
+        try:
+            chat = await bot.get_chat(muc_id)
+            print(f"✅ Bot can access MUC: {chat.title}")
+        except Exception as e:
+            print(f"❌ Cannot access Movie Update Channel {muc_id}: {e}")
+            await bot.send_message(LOG_CHANNEL, f"❌ Cannot access MUC {muc_id}: {e}")
+            return
 
         print("📨 Sending update to MUC:", muc_id)
 
@@ -186,14 +179,12 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
             url = f"https://jisshuapis.vercel.app/api.php?query={query}"
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as res:
                 if res.status != 200:
-                    print(f"Poster API error: HTTP {res.status}")
                     return None
                 data = await res.json()
                 for key in ["jisshu-2", "jisshu-3", "jisshu-4"]:
                     posters = data.get(key)
                     if posters and isinstance(posters, list) and posters:
                         return posters[0]
-                print(f"No poster found for {title}")
                 return None
     except Exception as e:
         print(f"❌ Poster fetch error: {e}")
