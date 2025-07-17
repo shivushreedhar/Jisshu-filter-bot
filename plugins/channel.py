@@ -1,11 +1,16 @@
 import re, asyncio, aiohttp
-from typing import Optional
 from collections import defaultdict
+from typing import Optional
 
 from pyrogram import Client, filters, enums
-from info import *
-from utils import *
+from info import MOVIE_UPDATE_CHANNEL, CHANNELS
+from utils import temp
 from database.ia_filterdb import save_file, unpack_new_file_id
+
+media_filter = filters.document | filters.video | filters.audio
+movie_files = defaultdict(list)
+waiting_tasks = dict()
+POST_DELAY = 25
 
 LANGUAGE_KEYWORDS = {
     "kannada": "Kannada", "kan": "Kannada",
@@ -19,118 +24,84 @@ LANGUAGE_KEYWORDS = {
     "gujarati": "Gujarati", "urdu": "Urdu"
 }
 
-media_filter = filters.document | filters.video | filters.audio
-movie_files = defaultdict(list)
-grouping_timers = dict()
-GROUPING_DELAY = 25
-
 
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
-    try:
-        media = getattr(message, message.media.value, None)
-        if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
-            media.file_type = message.media.value
-            media.caption = message.caption
-            status = await save_file(media)
-            if status == "suc":
-                await queue_movie_file(bot, media)
-    except Exception as e:
-        print(f"❌ media error: {e}")
+    media_obj = getattr(message, message.media.value, None)
+    if not media_obj or media_obj.mime_type not in ["video/mp4", "video/x-matroska", "document/mp4"]:
+        return
 
+    await save_file(media_obj)
+    file_name = await movie_name_format(media_obj.file_name or "")
+    title_key = await simplify_title(file_name)
 
-async def queue_movie_file(bot, media):
-    try:
-        file_name = await movie_name_format(media.file_name)
-        caption = await movie_name_format(media.caption or "")
-        key = await simplify_title(file_name)
+    file_size = format_file_size(media_obj.file_size)
+    file_id, _ = unpack_new_file_id(media_obj.file_id)
+    caption_text = await movie_name_format(message.caption or "")
 
-        year = await extract_year(caption) or await extract_year(file_name) or "N/A"
-        quality = await get_qualities(caption) or "HDRip"
-        language = detect_language(f"{file_name} {caption}".lower())
+    language = detect_language(f"{file_name} {caption_text}".lower())
+    quality = await get_qualities(f"{file_name} {caption_text}")
+    year = await extract_year(f"{file_name} {caption_text}") or "N/A"
 
-        file_size_str = format_file_size(media.file_size)
-        file_id, _ = unpack_new_file_id(media.file_id)
+    movie_files[title_key].append({
+        "file_id": file_id,
+        "file_size": file_size,
+        "quality": quality,
+        "language": language,
+        "year": year
+    })
 
-        movie_files[key].append({
-            "quality": quality,
-            "file_id": file_id,
-            "file_size": file_size_str,
-            "caption": caption,
-            "language": language,
-            "year": year
-        })
+    print(f"[{title_key}] ➕ File added to DB ({quality}, {file_size})")
 
-        print(f"[{key}] ➕ File added to DB ({quality}, {file_size_str})")
+    if title_key in waiting_tasks:
+        waiting_tasks[title_key].cancel()
 
-        # Reset existing timer if running
-        if key in grouping_timers:
-            grouping_timers[key].cancel()
-
-        # Start new timer
-        grouping_timers[key] = asyncio.create_task(wait_and_post(bot, key))
-
-    except Exception as e:
-        print(f"❌ queue_movie_file error: {e}")
+    waiting_tasks[title_key] = asyncio.create_task(wait_and_post(bot, title_key))
 
 
 async def wait_and_post(bot, key):
     try:
-        for remaining in range(GROUPING_DELAY, 0, -1):
+        remaining = POST_DELAY
+        print(f"[{key}] New file detected. Timer reset.")
+        while remaining > 0:
             print(f"[{key}] Waiting for file {remaining} sec...")
             await asyncio.sleep(1)
+            remaining -= 1
 
         print(f"[{key}] No file came. Sending post to MUC...")
 
         await send_movie_update(bot, key, movie_files[key])
+        print(f"[{key}] ✅ Post sent to MUC.")
 
         del movie_files[key]
-        del grouping_timers[key]
+        del waiting_tasks[key]
 
     except asyncio.CancelledError:
-        print(f"[{key}] New file detected. Timer reset.")
+        print(f"[{key}] New file detected during wait. Countdown reset.")
     except Exception as e:
-        print(f"❌ wait_and_post error: {e}")
+        print(f"[{key}] ❌ Error in wait_and_post: {e}")
 
 
-async def send_movie_update(bot, file_name, files):
-    try:
-        poster = await fetch_movie_poster(file_name) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
-        language = files[0]["language"]
-        quality_text = files[0]["quality"]
-        year = files[0]["year"]
+async def send_movie_update(bot, title_key, files):
+    poster = await fetch_movie_poster(title_key) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-        combined_mode = "combined" in file_name.lower()
-        is_series = combined_mode or bool(re.search(r"(?i)(S\d{1,2}|Season|Episode|E\d{1,2})", file_name))
+    file_lines = ""
+    qualities_present = []
 
-        file_lines = ""
+    year = files[0].get("year", "N/A")
+    language = files[0].get("language", "Unknown")
 
-        if not is_series:
-            # Movie Mode
-            for file in files:
-                q = file.get("quality", "HDRip")
-                file_id = file["file_id"]
-                file_lines += f"<b>🎉 {q} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+    for file in files:
+        q = file.get("quality", "HDRip")
+        qualities_present.append(q)
+        link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
+        file_lines += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
 
-        elif combined_mode or len(files) == 1:
-            # Combined Season Mode
-            file = files[0]
-            q = file.get("quality", "HDRip")
-            file_id = file["file_id"]
-            file_lines += f"<b>🎉 Complete Season [{q}] :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
+    caption = f"""
+<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
 
-        else:
-            # Series Mode (Episodes)
-            ep_num = 1
-            for file in files:
-                file_id = file["file_id"]
-                file_lines += f"<b>🎉 EPISODE {str(ep_num).zfill(2)} :</b> <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>Download Link</a>\n"
-                ep_num += 1
-
-        caption = f"""<blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
-
-<b>🎬 Title : {file_name} ({year})</b>
-<b>🛠️ Available In : {quality_text}</b>
+<b>🎬 Title : {title_key} ({year})</b>
+<b>🛠️ Available In : {', '.join(sorted(set(qualities_present)))}</b>
 <b>🔊 Audio : {language}</b>
 
 <b>📥 Download Links :</b>
@@ -138,32 +109,24 @@ async def send_movie_update(bot, file_name, files):
 <b>{file_lines}</b>
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
-<blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
+<blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>
+"""
 
-        await bot.send_photo(chat_id=MOVIE_UPDATE_CHANNEL, photo=poster, caption=caption, parse_mode=enums.ParseMode.HTML)
+    await bot.send_photo(
+        chat_id=MOVIE_UPDATE_CHANNEL,
+        photo=poster,
+        caption=caption,
+        parse_mode=enums.ParseMode.HTML
+    )
 
-        print(f"[{file_name}] ✅ Post sent to MUC.")
 
-    except Exception as e:
-        print(f"❌ send_movie_update error: {e}")
-
-
-async def simplify_title(file_name):
-    name = await movie_name_format(file_name)
-    season_match = re.search(r"(?i)(S(\d{1,2})|Season\s?(\d{1,2}))", file_name)
-    if season_match:
-        season_number = season_match.group(2) or season_match.group(3)
-        base_title = re.split(r"S\d{1,2}|Season\s?\d{1,2}", name, maxsplit=1)[0].strip()
-        return f"{base_title} S{season_number}"
-    else:
-        return name.strip()
+async def simplify_title(text):
+    name = await movie_name_format(text)
+    return name.strip()
 
 
 def detect_language(text):
-    found_langs = set()
-    for k, lang in LANGUAGE_KEYWORDS.items():
-        if re.search(rf"\b{k}\b", text):
-            found_langs.add(lang)
+    found_langs = {lang for k, lang in LANGUAGE_KEYWORDS.items() if re.search(rf"\b{k}\b", text)}
     return ", ".join(sorted(found_langs)) if found_langs else "English"
 
 
@@ -194,35 +157,26 @@ def format_file_size(size_bytes):
 
 
 async def movie_name_format(file_name):
-    filename = re.sub(
-        r"http\S+",
-        "",
-        re.sub(r"@\w+|#\w+", "", file_name)
-        .replace("_", " ")
-        .replace("[", "")
-        .replace("]", "")
-        .replace("(", "")
-        .replace(")", "")
-        .replace("{", "")
-        .replace("}", "")
-        .replace(".", " ")
-        .replace("@", "")
-        .replace(":", "")
-        .replace(";", "")
-        .replace("'", "")
-        .replace("-", "")
-        .replace("!", ""),
-    ).strip()
-    return filename
+    cleaned = re.sub(r"http\S+", "", file_name)
+    cleaned = re.sub(r"@\w+|#\w+", "", cleaned)
+    cleaned = cleaned.replace("_", " ").replace("[", "").replace("]", "")
+    cleaned = cleaned.replace("(", "").replace(")", "").replace("{", "").replace("}", "")
+    cleaned = cleaned.replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
+    cleaned = cleaned.replace("'", "").replace("-", " ").replace("!", "").strip()
+    return cleaned
 
 
 async def get_qualities(text):
-    qualities = ["400MB", "450MB", "480p", "700MB", "720p", "800MB",
-                 "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip",
-                 "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS",
-                 "CAMRip", "DVDScr"]
-    found = [q for q in qualities if q.lower() in text.lower()]
-    return found[0] if found else "HDRip"
+    qualities = [
+        "400MB", "450MB", "480p", "700MB", "720p", "800MB",
+        "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip",
+        "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS",
+        "CAMRip", "DVDScr", "TRUE WEB-DL"
+    ]
+    for q in qualities:
+        if q.lower() in text.lower():
+            return q
+    return "HDRip"
 
 
 async def extract_year(text):
