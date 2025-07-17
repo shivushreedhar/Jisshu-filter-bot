@@ -4,6 +4,7 @@ from Script import script
 
 id_pattern = re.compile(r"^-?\d+$")
 
+
 def is_enabled(value, default):
     if value.lower() in ["true", "yes", "1", "enable", "y"]:
         return True
@@ -11,6 +12,7 @@ def is_enabled(value, default):
         return False
     else:
         return default
+
 
 # Main
 SESSION = environ.get("SESSION", "Media_search")
@@ -132,6 +134,9 @@ SLEEP_THRESHOLD = int(environ.get("SLEEP_THRESHOLD", "60"))
 PING_INTERVAL = int(environ.get("PING_INTERVAL", "1200"))
 ON_HEROKU = "DYNO" in environ
 URL = environ.get("FQDN", "")
+
+# Webserver Port (for health checks)
+PORT = int(environ.get("PORT", "8080"))
 
 # Admin Commands
 admin_cmds = [
