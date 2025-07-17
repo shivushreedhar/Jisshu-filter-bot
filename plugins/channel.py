@@ -1,18 +1,16 @@
 # --| This code created by: Jisshu_bots & SilentXBotz |--
 
 import re
-import hashlib
 import asyncio
 import aiohttp
-from typing import Optional
 from collections import defaultdict
+from typing import Optional
 
-from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LOG_CHANNEL
+from info import MOVIE_UPDATE_CHANNEL, LOG_CHANNEL
 from utils import get_poster, temp
 from pyrogram import Client, filters, enums
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
-
 
 # Language Keywords Extended
 CAPTION_LANGUAGES = [
@@ -40,7 +38,7 @@ UPDATE_CAPTION = """<b><blockquote>🎉 Streaming Now 🎉</b></blockquote>
 
 <b>{}</b>
 
-<blockquote><b> Download Now & Dive In </b></blockquote>
+<b> Download Now & Dive In </b>
 
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
@@ -48,21 +46,17 @@ notified_movies = set()
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
-
 media_filter = filters.document | filters.video | filters.audio
 
 
-@Client.on_message(filters.chat(CHANNELS) & media_filter)
+@Client.on_message(filters.channel & media_filter)
 async def media(bot, message):
     bot_id = bot.me.id
     media = getattr(message, message.media.value, None)
-
     if media and media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
         media.file_type = message.media.value
         media.caption = message.caption
-
         save_status = await save_file(media)
-
         if save_status == "suc" and await db.get_send_movie_update_status(bot_id):
             await queue_movie_file(bot, media)
 
@@ -71,10 +65,8 @@ async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
-
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
-
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption)
 
         if year:
@@ -103,8 +95,8 @@ async def queue_movie_file(bot, media):
 
         if file_name in processing_movies:
             return
-
         processing_movies.add(file_name)
+
         await asyncio.sleep(POST_DELAY)
 
         if file_name in movie_files:
@@ -122,7 +114,6 @@ async def send_movie_update(bot, file_name, files):
     try:
         if file_name in notified_movies:
             return
-
         notified_movies.add(file_name)
 
         imdb_data = await get_imdb(file_name)
@@ -142,6 +133,11 @@ async def send_movie_update(bot, file_name, files):
 
         full_caption = UPDATE_CAPTION.format(kind, title, year or "", files[0]["quality"], language, quality_text)
 
+        if len(full_caption) > 1000:
+            full_caption = full_caption[:1000] + "..."
+
+        print(f"[Koyeb Log] ➜ Sending {file_name} to MCU {MOVIE_UPDATE_CHANNEL}")
+
         await bot.send_photo(
             chat_id=MOVIE_UPDATE_CHANNEL,
             photo=poster or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg",
@@ -152,10 +148,11 @@ async def send_movie_update(bot, file_name, files):
         print(f"[Koyeb Log] ✅ Posted: {file_name}")
 
     except Exception as e:
-        await bot.send_message(LOG_CHANNEL, f"[Koyeb Log] ❌ Error sending post for {file_name}: {e}")
+        await bot.send_message(LOG_CHANNEL, f"[Koyeb Log] ❌ Post error for {file_name}: {e}")
+        print(f"[Koyeb Log] ❌ Post error for {file_name}: {e}")
 
 
-# ---------- UTILITIES -----------
+# ---------- UTILITIES ----------
 
 async def get_imdb(file_name):
     try:
@@ -194,7 +191,8 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
 async def get_qualities(text):
     qualities = [
         "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
-        "ORG", "org", "HDRip", "hdrip", "CAMRip", "camrip", "WEB-DL", "hdtc", "predvd", "dvdscr", "dvdrip", "HDTS", "hdts"
+        "ORG", "org", "HDRip", "hdrip", "CAMRip", "camrip", "WEB-DL",
+        "hdtc", "predvd", "dvdscr", "dvdrip", "HDTS", "hdts"
     ]
     found_qualities = [q for q in qualities if q.lower() in text.lower()]
     return ", ".join(found_qualities) or "HDRip"
