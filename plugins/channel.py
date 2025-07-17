@@ -1,6 +1,7 @@
 import re
 import asyncio
 import aiohttp
+
 from typing import Optional
 from collections import defaultdict
 
@@ -57,7 +58,6 @@ async def media(bot, message):
             print(f"✅ File saved status: {status}")
             if status == "suc":
                 await queue_movie_file(bot, media)
-
     except Exception as e:
         print(f"❌ Error in media: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ media error: {e}")
