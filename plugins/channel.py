@@ -1,13 +1,17 @@
 import re
 import asyncio
 import aiohttp
+
 from typing import Optional
 from collections import defaultdict
+
 from pyrogram import Client, filters, enums
+
 from info import *
 from utils import *
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
+
 
 LANGUAGE_KEYWORDS = {
     "tam": "Tamil", "tamil": "Tamil",
@@ -36,7 +40,6 @@ UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
 media_filter = filters.document | filters.video | filters.audio
-
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
@@ -74,8 +77,7 @@ async def queue_movie_file(bot, media):
         season_tag = f" Season {season_match.group(1)}" if season_match else ""
 
         group_key = (file_name.split(' ')[0] + season_tag).strip()
-
-        print(f"🔗 Grouping under: {group_key}")
+        print(f"🔗 Grouping under: {group_key} | File: {file_name}")
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
@@ -129,12 +131,11 @@ async def send_movie_update(bot, file_name, files):
                 languages.update(file["language"].split(", "))
 
         language = ", ".join(sorted(languages)) or "Unknown"
-
         files.sort(key=lambda x: x.get("episode") or 0)
 
         quality_text = ""
         for file in files:
-            q = file.get("jisshuquality") or file.get("quality") or "Unknown"
+            q = file.get("jisshuquality") or "Unknown"
             size = file["file_size"]
             file_id = file["file_id"]
             ep = file.get("episode")
@@ -145,19 +146,26 @@ async def send_movie_update(bot, file_name, files):
                 quality_text += f"🎉 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         kind_name = "SERIES" if is_series else "MOVIE"
-        caption = UPDATE_CAPTION.format(kind_name, title, year, files[0]["quality"], language, quality_text)
+        caption = UPDATE_CAPTION.format(
+            kind_name,
+            title,
+            year,
+            files[0]["jisshuquality"],
+            language,
+            quality_text
+        )
 
         muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
 
         try:
             chat = await bot.get_chat(muc_id)
-            print(f"✅ Bot can access MUC: {chat.title}")
+            print(f"✅ Bot can access MUC: {chat.title} ({muc_id})")
         except Exception as e:
             print(f"❌ Cannot access MUC {muc_id}: {e}")
             await bot.send_message(LOG_CHANNEL, f"❌ Cannot access MUC {muc_id}: {e}")
             return
 
-        print("📨 Sending update to MUC:", muc_id)
+        print(f"📨 Sending update to MUC: {muc_id} | Movie: {title} ({year}) | Files: {len(files)}")
 
         await bot.send_photo(
             chat_id=muc_id,
