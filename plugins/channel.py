@@ -69,7 +69,6 @@ async def wait_and_post(bot, key):
             remaining -= 1
 
         print(f"[{key}] No file came. Sending post to MUC...")
-
         await send_movie_update(bot, key, movie_files[key])
         print(f"[{key}] ✅ Post sent to MUC.")
 
@@ -85,23 +84,29 @@ async def wait_and_post(bot, key):
 async def send_movie_update(bot, title_key, files):
     poster = await fetch_movie_poster(title_key) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-    file_lines = ""
-    qualities_present = []
-
     year = files[0].get("year", "N/A")
     language = files[0].get("language", "Unknown")
 
-    for file in files:
-        q = file.get("quality", "HDRip")
-        qualities_present.append(q)
-        link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
-        file_lines += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
+    # Detect if it's a series
+    is_series = any(re.search(r"(?i)(S\d{1,2}|Season\s?\d{1,2}|E\d{1,2}|Episode\s?\d{1,2})", f["quality"]) for f in files)
+
+    file_lines = ""
+    if is_series:
+        for idx, file in enumerate(sorted(files, key=lambda x: x.get("quality"))):
+            link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
+            file_lines += f"🎉<b>Episode {idx+1} : <a href='{link}'>Download Link</a></b>\n"
+    else:
+        qualities_present = []
+        for file in files:
+            q = file.get("quality", "HDRip")
+            qualities_present.append(q)
+            link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
+            file_lines += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
 
     caption = f"""
 <blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
 
 <b>🎬 Title : {title_key} ({year})</b>
-<b>🛠️ Available In : {', '.join(sorted(set(qualities_present)))}</b>
 <b>🔊 Audio : {language}</b>
 
 <b>📥 Download Links :</b>
@@ -171,7 +176,7 @@ async def get_qualities(text):
         "400MB", "450MB", "480p", "700MB", "720p", "800MB",
         "720p HEVC", "1080p", "1080p HEVC", "2160p", "HDRip",
         "HDCAM", "WEB-DL", "WebRip", "PreDVD", "PRE-HD", "HDTS",
-        "CAMRip", "DVDScr", "TRUE WEB-DL"
+        "CAMRip", "DVDScr", "TRUE WEB-DL", "HEVC"
     ]
     for q in qualities:
         if q.lower() in text.lower():
