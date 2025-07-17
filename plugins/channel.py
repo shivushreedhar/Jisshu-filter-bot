@@ -1,5 +1,6 @@
-ef Jisshu_qualities(text, file_name):
-import re, hashlib, asyncio, aiohttp
+import re
+import asyncio
+import aiohttp
 from typing import Optional
 from collections import defaultdict
 from pyrogram import Client, filters, enums
@@ -8,7 +9,6 @@ from utils import *
 from database.users_chats_db import db
 from database.ia_filterdb import save_file, unpack_new_file_id
 
-# Language keyword patterns (supports abbreviations)
 LANGUAGE_KEYWORDS = {
     "tam": "Tamil",
     "tamil": "Tamil",
@@ -20,27 +20,15 @@ LANGUAGE_KEYWORDS = {
     "malayalam": "Malayalam",
     "hin": "Hindi",
     "hindi": "Hindi",
-    "beng": "Bengali",
-    "bengali": "Bengali",
     "eng": "English",
     "english": "English",
-    "punjabi": "Punjabi",
-    "pan": "Punjabi",
-    "urdu": "Urdu",
-    "marathi": "Marathi",
-    "gujarati": "Gujarati",
-    "gujrati": "Gujarati",
-    "arabic": "Arabic",
-    "chinese": "Chinese",
-    "japanese": "Japanese",
-    "spanish": "Spanish",
-    "french": "French",
-    "russian": "Russian",
-    "odia": "Odia",
-    "assamese": "Assamese",
-    "bhojpuri": "Bhojpuri",
-    "bangla": "Bangla",
+    "ben": "Bengali",
+    "bengali": "Bengali",
+    "pun": "Punjabi",
+    "punjabi": "Punjabi"
 }
+
+CAPTION_LANGUAGES = list(set(LANGUAGE_KEYWORDS.values()))
 
 UPDATE_CAPTION = """<b>𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</b>
 
@@ -82,14 +70,6 @@ async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
-
-        combined_text = f"{file_name} {caption}".lower()
-        detected_languages = set()
-        for key, lang in LANGUAGE_KEYWORDS.items():
-            if re.search(rf"\b{re.escape(key)}\b", combined_text):
-                detected_languages.add(lang)
-        language = ", ".join(sorted(detected_languages)) if detected_languages else "Unknown"
-
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
 
@@ -102,8 +82,9 @@ async def queue_movie_file(bot, media):
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
+        language = detect_languages(caption) or "Not Idea"
         file_size_str = format_file_size(media.file_size)
-        file_id, file_ref = unpack_new_file_id(media.file_id)
+        file_id, _ = unpack_new_file_id(media.file_id)
 
         movie_files[file_name].append({
             "quality": quality,
@@ -140,10 +121,16 @@ async def send_movie_update(bot, file_name, files):
         kind = imdb_data.get("kind", "").strip().upper().replace(" ", "_")
         if kind == "TV_SERIES":
             kind = "SERIES"
+
         year = imdb_data.get("year", files[0]["year"])
         poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-        language = files[0]["language"]
+        languages = set()
+        for file in files:
+            if file["language"] != "Not Idea":
+                languages.update(file["language"].split(", "))
+
+        language = ", ".join(sorted(languages)) or "Not Idea"
 
         quality_text = ""
         for file in files:
@@ -234,6 +221,15 @@ async def get_qualities(text):
     return ", ".join(found) or "HDRip"
 
 
+def detect_languages(text):
+    detected = set()
+    lower_text = text.lower()
+    for keyword, language in LANGUAGE_KEYWORDS.items():
+        if keyword in lower_text:
+            detected.add(language)
+    return ", ".join(sorted(detected)) if detected else None
+
+
 async def Jisshu_qualities(text, file_name):
-    return await get_qualities(text)
-        
+    return await get_qualities(text + " " + file_name)
+    
