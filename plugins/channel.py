@@ -3,7 +3,9 @@ import asyncio
 import aiohttp
 from typing import Optional
 from collections import defaultdict
+
 from pyrogram import Client, filters, enums
+
 from info import *
 from utils import *
 from database.users_chats_db import db
@@ -22,19 +24,21 @@ LANGUAGE_KEYWORDS = {
 
 CAPTION_LANGUAGES = list(set(LANGUAGE_KEYWORDS.values()))
 
-UPDATE_CAPTION = """<b>𝖭𝖤𝖶 {} 𝖠𝖣𝖣𝖤𝖣 ✅</b>
+UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
 
 🎬 <b>Title : {} {}</b>
-🔰 <b>Quality : </b> {}
-🎧 <b>Audio : </b> {}
+🛠️ <b>Available in : {}</b>
+🔊 <b>Audio : {}</b>
 
-<b>✨ Telegram Files ✨</b>
+<b>📥 Download Now</b>
 
-{}
+<b>{}</b>
 
-<blockquote>〽️ Powered by @BSHEGDE5</blockquote>"""
+<blockquote><b>🚀 Download And Dive In !</b></blockquote>
+<blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
 media_filter = filters.document | filters.video | filters.audio
+
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
@@ -53,6 +57,7 @@ async def media(bot, message):
             print(f"✅ File saved status: {status}")
             if status == "suc":
                 await queue_movie_file(bot, media)
+
     except Exception as e:
         print(f"❌ Error in media: {e}")
         await bot.send_message(LOG_CHANNEL, f"❌ media error: {e}")
@@ -62,23 +67,25 @@ async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
+
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
 
-        season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption) or re.search(r"(?i)(?:s|season)0*(\d{1,2})", file_name)
-        if year:
-            file_name = file_name[: file_name.find(year) + 4]
-        elif season_match:
-            season = season_match.group(1)
-            file_name = file_name[: file_name.find(season) + 1]
+        season_match = re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", caption) \
+                       or re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", file_name)
+        season_tag = f" Season {season_match.group(1)}" if season_match else ""
+
+        group_key = (file_name + season_tag).strip()
 
         quality = await get_qualities(caption) or "HDRip"
         jisshuquality = await Jisshu_qualities(caption, media.file_name) or "720p"
-        language = detect_languages(caption) or "Not Idea"
+        language = detect_languages(caption) or "Unknown"
         file_size_str = format_file_size(media.file_size)
         file_id, _ = unpack_new_file_id(media.file_id)
 
-        movie_files[file_name].append({
+        episode = extract_episode_number(file_name + caption)
+
+        movie_files[group_key].append({
             "quality": quality,
             "jisshuquality": jisshuquality,
             "file_id": file_id,
@@ -86,19 +93,20 @@ async def queue_movie_file(bot, media):
             "caption": caption,
             "language": language,
             "year": year,
+            "episode": episode
         })
 
-        if file_name in processing_movies:
+        if group_key in processing_movies:
             return
 
-        processing_movies.add(file_name)
+        processing_movies.add(group_key)
         await asyncio.sleep(POST_DELAY)
 
-        if file_name in movie_files:
-            await send_movie_update(bot, file_name, movie_files[file_name])
-            del movie_files[file_name]
+        if group_key in movie_files:
+            await send_movie_update(bot, group_key, movie_files[group_key])
+            del movie_files[group_key]
 
-        processing_movies.remove(file_name)
+        processing_movies.remove(group_key)
 
     except Exception as e:
         print(f"❌ queue_movie_file error: {e}")
@@ -111,35 +119,42 @@ async def send_movie_update(bot, file_name, files):
         imdb_data = await get_imdb(file_name)
         title = imdb_data.get("title", file_name)
         kind = imdb_data.get("kind", "").strip().upper().replace(" ", "_")
-        if kind == "TV_SERIES":
-            kind = "SERIES"
+        is_series = kind in ["TV_SERIES", "SERIES"]
 
         year = imdb_data.get("year", files[0]["year"])
         poster = await fetch_movie_poster(title, year) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
         languages = set()
         for file in files:
-            if file["language"] != "Not Idea":
+            if file["language"] != "Unknown":
                 languages.update(file["language"].split(", "))
 
-        language = ", ".join(sorted(languages)) or "Not Idea"
+        language = ", ".join(sorted(languages)) or "Unknown"
+
+        files.sort(key=lambda x: x.get("episode") or 0)
 
         quality_text = ""
         for file in files:
             q = file.get("jisshuquality") or file.get("quality") or "Unknown"
             size = file["file_size"]
             file_id = file["file_id"]
-            quality_text += f"📦 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
+            ep = file.get("episode")
 
-        caption = UPDATE_CAPTION.format(kind, title, year, files[0]["quality"], language, quality_text)
+            if is_series and ep:
+                quality_text += f"🎉 Episode {ep} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
+            else:
+                quality_text += f"🎉 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
+
+        kind_name = "SERIES" if is_series else "MOVIE"
+        caption = UPDATE_CAPTION.format(kind_name, title, year, files[0]["quality"], language, quality_text)
+
         muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
 
-        # ✅ Peer ID avoidance
         try:
             chat = await bot.get_chat(muc_id)
             print(f"✅ Bot can access MUC: {chat.title}")
         except Exception as e:
-            print(f"❌ Cannot access Movie Update Channel {muc_id}: {e}")
+            print(f"❌ Cannot access MUC {muc_id}: {e}")
             await bot.send_message(LOG_CHANNEL, f"❌ Cannot access MUC {muc_id}: {e}")
             return
 
@@ -210,16 +225,14 @@ async def movie_name_format(file_name):
         .replace("'", "").replace("-", "")
         .replace("!", "")).strip()
 
+
 async def get_qualities(text):
     qualities = [
-        "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
+        "480p", "400MB", "700MB", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
         "HDRip", "HDCAM", "WEB-DL", "PreDVD", "CAMRip", "DVDScr"
     ]
-    for q in qualities:
-        if q.lower() in text.lower():
-            return q  # Return first match only
-    return "HDRip"
-
+    found = [q for q in qualities if q.lower() in text.lower()]
+    return ", ".join(found) or "720p"
 
 
 def detect_languages(text):
@@ -233,4 +246,9 @@ def detect_languages(text):
 
 async def Jisshu_qualities(text, file_name):
     return await get_qualities(text + " " + file_name)
+
+
+def extract_episode_number(text: str) -> Optional[int]:
+    m = re.search(r"(?:EP|Ep|Episode)[\s\-_]?0*(\d{1,3})", text, re.IGNORECASE)
+    return int(m.group(1)) if m else None
     
