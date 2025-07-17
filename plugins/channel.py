@@ -1,30 +1,33 @@
-# --| This code created by: Jisshu_bots & SilentXBotz |--# 
+# --| This code created by: Jisshu_bots & SilentXBotz |--
+
 import re
 import hashlib
 import asyncio
-from info import MOVIE_UPDATE_CHANNEL, LOG_CHANNEL
-from utils import *
-from pyrogram import Client, filters, enums
-from database.users_chats_db import db
-from database.ia_filterdb import save_file, unpack_new_file_id
 import aiohttp
 from typing import Optional
 from collections import defaultdict
 
+from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LOG_CHANNEL
+from utils import get_poster, temp
+from pyrogram import Client, filters, enums
+from database.users_chats_db import db
+from database.ia_filterdb import save_file, unpack_new_file_id
+
+
 # Language Keywords Extended
 CAPTION_LANGUAGES = [
     "Bhojpuri", "bho", "bhojp", "Hindi", "hin", "hindi",
-    "Bengali", "ben", "bengali", "Bangla", "bangla", "bang",
-    "Tamil", "tam", "tamil", "English", "eng", "english",
-    "Telugu", "tel", "telugu", "Malayalam", "mal", "malayalam",
-    "Kannada", "kan", "kannada", "Marathi", "mar", "marathi",
-    "Punjabi", "pun", "punjabi", "Bengoli", "beng", "bengoli",
-    "Gujrati", "guj", "gujrati", "gujarati", "Korean", "kor", "korean",
-    "Spanish", "spa", "spanish", "French", "fre", "french",
-    "German", "ger", "german", "Chinese", "chi", "chinese",
-    "Arabic", "ara", "arabic", "Portuguese", "por", "portuguese",
-    "Russian", "rus", "russian", "Japanese", "jap", "japanese",
-    "Odia", "ori", "odia", "Assamese", "ass", "assamese", "Urdu", "urd", "urdu"
+    "Bengali", "ben", "bengali", "Bangla", "bangla", "bang", "Tamil", "tam", "tamil",
+    "English", "eng", "english", "Telugu", "tel", "telugu",
+    "Malayalam", "mal", "malayalam", "Kannada", "kan", "kannada",
+    "Marathi", "mar", "marathi", "Punjabi", "pun", "punjabi",
+    "Bengoli", "beng", "bengoli", "Gujrati", "guj", "gujrati", "gujarati",
+    "Korean", "kor", "korean", "Spanish", "spa", "spanish",
+    "French", "fre", "french", "German", "ger", "german",
+    "Chinese", "chi", "chinese", "Arabic", "ara", "arabic",
+    "Portuguese", "por", "portuguese", "Russian", "rus", "russian",
+    "Japanese", "jap", "japanese", "Odia", "ori", "odia",
+    "Assamese", "ass", "assamese", "Urdu", "urd", "urdu"
 ]
 
 UPDATE_CAPTION = """<b><blockquote>🎉 Streaming Now 🎉</b></blockquote>
@@ -37,14 +40,15 @@ UPDATE_CAPTION = """<b><blockquote>🎉 Streaming Now 🎉</b></blockquote>
 
 <b>{}</b>
 
-<b> Download Now & Dive In </b>
+<blockquote><b> Download Now & Dive In </b></blockquote>
 
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
 notified_movies = set()
 movie_files = defaultdict(list)
-POST_DELAY = 25  # Delay before posting
+POST_DELAY = 25
 processing_movies = set()
+
 media_filter = filters.document | filters.video | filters.audio
 
 
@@ -52,10 +56,13 @@ media_filter = filters.document | filters.video | filters.audio
 async def media(bot, message):
     bot_id = bot.me.id
     media = getattr(message, message.media.value, None)
+
     if media and media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
         media.file_type = message.media.value
         media.caption = message.caption
+
         save_status = await save_file(media)
+
         if save_status == "suc" and await db.get_send_movie_update_status(bot_id):
             await queue_movie_file(bot, media)
 
@@ -64,8 +71,10 @@ async def queue_movie_file(bot, media):
     try:
         file_name = await movie_name_format(media.file_name)
         caption = await movie_name_format(media.caption or "")
+
         year_match = re.search(r"\b(19|20)\d{2}\b", caption)
         year = year_match.group(0) if year_match else None
+
         season_match = re.search(r"(?i)(?:s|season)0*(\d{1,2})", caption)
 
         if year:
@@ -94,8 +103,8 @@ async def queue_movie_file(bot, media):
 
         if file_name in processing_movies:
             return
-        processing_movies.add(file_name)
 
+        processing_movies.add(file_name)
         await asyncio.sleep(POST_DELAY)
 
         if file_name in movie_files:
@@ -113,17 +122,13 @@ async def send_movie_update(bot, file_name, files):
     try:
         if file_name in notified_movies:
             return
+
         notified_movies.add(file_name)
 
         imdb_data = await get_imdb(file_name)
         title = imdb_data.get("title", file_name)
         kind = imdb_data.get("kind", "").upper().replace(" ", "_")
-        if kind == "TV_SERIES":
-            kind = "SERIES"
-        elif kind == "MOVIE":
-            kind = "MOVIE"
-        else:
-            kind = "MOVIE"
+        kind = "SERIES" if kind == "TV_SERIES" else "MOVIE"
 
         year = files[0].get("year", "")
         poster = await fetch_movie_poster(title, year)
@@ -138,7 +143,7 @@ async def send_movie_update(bot, file_name, files):
         full_caption = UPDATE_CAPTION.format(kind, title, year or "", files[0]["quality"], language, quality_text)
 
         await bot.send_photo(
-            chat_id=MOVIE_UPDATE_CHANNEL,  # <-- Forced usage of your MUC ID from info.py
+            chat_id=MOVIE_UPDATE_CHANNEL,
             photo=poster or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg",
             caption=full_caption,
             parse_mode=enums.ParseMode.HTML
@@ -150,7 +155,8 @@ async def send_movie_update(bot, file_name, files):
         await bot.send_message(LOG_CHANNEL, f"[Koyeb Log] ❌ Error sending post for {file_name}: {e}")
 
 
-# ---------- UTILITIES (Do not modify) -----------
+# ---------- UTILITIES -----------
+
 async def get_imdb(file_name):
     try:
         formatted_name = await movie_name_format(file_name)
@@ -188,8 +194,7 @@ async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional
 async def get_qualities(text):
     qualities = [
         "480p", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p",
-        "ORG", "org", "HDRip", "hdrip", "CAMRip", "camrip",
-        "WEB-DL", "hdtc", "predvd", "dvdscr", "dvdrip", "HDTS", "hdts"
+        "ORG", "org", "HDRip", "hdrip", "CAMRip", "camrip", "WEB-DL", "hdtc", "predvd", "dvdscr", "dvdrip", "HDTS", "hdts"
     ]
     found_qualities = [q for q in qualities if q.lower() in text.lower()]
     return ", ".join(found_qualities) or "HDRip"
