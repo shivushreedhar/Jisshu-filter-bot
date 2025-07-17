@@ -10,7 +10,7 @@ from database.ia_filterdb import save_file, unpack_new_file_id
 media_filter = filters.document | filters.video | filters.audio
 movie_files = defaultdict(list)
 waiting_tasks = dict()
-POST_DELAY = 25  # Time to wait for grouping
+POST_DELAY = 25
 
 LANGUAGE_KEYWORDS = {
     "kannada": "Kannada", "kan": "Kannada",
@@ -24,6 +24,7 @@ LANGUAGE_KEYWORDS = {
     "gujarati": "Gujarati", "urdu": "Urdu"
 }
 
+
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
     media_obj = getattr(message, message.media.value, None)
@@ -31,6 +32,7 @@ async def media(bot, message):
         return
 
     await save_file(media_obj)
+
     file_name = await movie_name_format(media_obj.file_name or "")
     title_key = await simplify_title(file_name)
 
@@ -57,6 +59,7 @@ async def media(bot, message):
 
     waiting_tasks[title_key] = asyncio.create_task(wait_and_post(bot, title_key))
 
+
 async def wait_and_post(bot, key):
     try:
         remaining = POST_DELAY
@@ -79,18 +82,22 @@ async def wait_and_post(bot, key):
     except Exception as e:
         print(f"[{key}] ❌ Error in wait_and_post: {e}")
 
+
 async def send_movie_update(bot, title_key, files):
     poster = await fetch_movie_poster(title_key) or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+
     file_lines = ""
     qualities_present = []
+
     year = files[0].get("year", "N/A")
     language = files[0].get("language", "Unknown")
 
     for file in files:
         q = file.get("quality", "HDRip")
-        qualities_present.append(q)
+        if q not in qualities_present:
+            qualities_present.append(q)
         link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
-        file_lines += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
+        file_lines += f"🎉 <b>{q}</b> : <a href='{link}'>Download Link</a>\n"
 
     caption = f"""
 <blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
@@ -101,7 +108,7 @@ async def send_movie_update(bot, title_key, files):
 
 <b>📥 Download Links :</b>
 
-<b>{file_lines}</b>
+{file_lines}
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>
@@ -114,13 +121,16 @@ async def send_movie_update(bot, title_key, files):
         parse_mode=enums.ParseMode.HTML
     )
 
+
 async def simplify_title(text):
     name = await movie_name_format(text)
     return name.strip()
 
+
 def detect_language(text):
     found_langs = {lang for k, lang in LANGUAGE_KEYWORDS.items() if re.search(rf"\b{k}\b", text)}
     return ", ".join(sorted(found_langs)) if found_langs else "English"
+
 
 async def fetch_movie_poster(title: str) -> Optional[str]:
     try:
@@ -139,12 +149,14 @@ async def fetch_movie_poster(title: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def format_file_size(size_bytes):
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_bytes < 1024:
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024
     return f"{size_bytes:.2f} PB"
+
 
 async def movie_name_format(file_name):
     cleaned = re.sub(r"http\S+", "", file_name)
@@ -154,6 +166,7 @@ async def movie_name_format(file_name):
     cleaned = cleaned.replace(".", " ").replace("@", "").replace(":", "").replace(";", "")
     cleaned = cleaned.replace("'", "").replace("-", " ").replace("!", "").strip()
     return cleaned
+
 
 async def get_qualities(text):
     qualities = [
@@ -166,6 +179,7 @@ async def get_qualities(text):
         if q.lower() in text.lower():
             return q
     return "HDRip"
+
 
 async def extract_year(text):
     match = re.search(r"\b(19|20)\d{2}\b", text)
