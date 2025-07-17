@@ -1,4 +1,6 @@
-import re, asyncio, aiohttp
+import re
+import asyncio
+import aiohttp
 from collections import defaultdict
 from typing import Optional
 
@@ -28,21 +30,22 @@ LANGUAGE_KEYWORDS = {
 @Client.on_message(filters.chat(CHANNELS) & media_filter)
 async def media(bot, message):
     media_obj = getattr(message, message.media.value, None)
-    if not media_obj or media_obj.mime_type not in ["video/mp4", "video/x-matroska", "document/mp4"]:
+    if not media_obj:
+        print("No media object found.")
         return
 
     await save_file(media_obj)
+    print(f"@{message.from_user.username} - {media_obj.file_name} is saved to database")
 
     file_name = await movie_name_format(media_obj.file_name or "")
     title_key = await simplify_title(file_name)
 
     file_size = format_file_size(media_obj.file_size)
     file_id, _ = unpack_new_file_id(media_obj.file_id)
-    caption_text = await movie_name_format(message.caption or "")
 
-    language = detect_language(f"{file_name} {caption_text}".lower())
-    quality = await get_qualities(f"{file_name} {caption_text}")
-    year = await extract_year(f"{file_name} {caption_text}") or "N/A"
+    language = detect_language(file_name.lower())
+    quality = await get_qualities(file_name)
+    year = await extract_year(file_name) or "N/A"
 
     movie_files[title_key].append({
         "file_id": file_id,
@@ -70,7 +73,6 @@ async def wait_and_post(bot, key):
             remaining -= 1
 
         print(f"[{key}] No file came. Sending post to MUC...")
-
         await send_movie_update(bot, key, movie_files[key])
         print(f"[{key}] ✅ Post sent to MUC.")
 
@@ -88,16 +90,14 @@ async def send_movie_update(bot, title_key, files):
 
     file_lines = ""
     qualities_present = []
-
     year = files[0].get("year", "N/A")
     language = files[0].get("language", "Unknown")
 
     for file in files:
         q = file.get("quality", "HDRip")
-        if q not in qualities_present:
-            qualities_present.append(q)
+        qualities_present.append(q)
         link = f"https://t.me/{temp.U_NAME}?start=file_0_{file['file_id']}"
-        file_lines += f"🎉 <b>{q}</b> : <a href='{link}'>Download Link</a>\n"
+        file_lines += f"🎉 <b>{q} : <a href='{link}'>Download Link</a></b>\n"
 
     caption = f"""
 <blockquote><b>🎉 NOW STREAMING! 🎉</b></blockquote>
@@ -108,7 +108,7 @@ async def send_movie_update(bot, title_key, files):
 
 <b>📥 Download Links :</b>
 
-{file_lines}
+<b>{file_lines}</b>
 
 <blockquote><b>🚀 Download and Dive In!</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>
