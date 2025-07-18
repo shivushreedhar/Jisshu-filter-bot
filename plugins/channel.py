@@ -23,7 +23,7 @@ LANGUAGE_KEYWORDS = {
 
 PRINT_TYPES = ["HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr"]
 
-UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
+UPDATE_CAPTION = """<b><blockquote>🎉 NEW {} STREAMING NOW 🎉</b></blockquote>
 
 🎬 <b>Title : {} {}</b>
 🛠️ <b>Available in : {}</b>
