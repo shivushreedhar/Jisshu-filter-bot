@@ -27,7 +27,7 @@ PRINT_TYPES = ["HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr"]
 
 CAPTION_LANGUAGES = list(set(LANGUAGE_KEYWORDS.values()))
 
-UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
+UPDATE_CAPTION = """<b><blockquote>🎉 NEW {} STREAMING NOW 🎉</b></blockquote>
 
 🎬 <b>Title : {} {}</b>
 🛠️ <b>Available in : {}</b>
@@ -53,11 +53,12 @@ async def media(bot, message):
         print(f"📥 File received in DB channel: {message.chat.id}")
         media = getattr(message, message.media.value, None)
 
-        if media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
+        if media and media.mime_type in ["video/mp4", "video/x-matroska", "document/mp4"]:
             media.file_type = message.media.value
             media.caption = message.caption
             status = await save_file(media)
             print(f"✅ File saved status: {status}")
+
             if status == "suc":
                 await queue_movie_file(bot, media)
 
@@ -75,7 +76,7 @@ async def queue_movie_file(bot, media):
         year = year_match.group(0) if year_match else None
 
         season_match = re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", caption) \
-                    or re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", file_name)
+            or re.search(r"(?i)(?:s|season)[\s\-_]?0*(\d{1,2})", file_name)
         season_tag = f" Season {season_match.group(1)}" if season_match else ""
 
         group_key = (file_name.split(' ')[0] + season_tag).strip()
@@ -150,19 +151,12 @@ async def send_movie_update(bot, file_name, files):
             ep = file.get("episode")
 
             if is_series and ep:
-                quality_text += f"🎉 Episode {ep} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
+                quality_text += f"✴️ Episode {ep} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
             else:
-                quality_text += f"🎉 {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
+                quality_text += f"✴️ {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         kind_name = "SERIES" if is_series else "MOVIE"
-        caption = UPDATE_CAPTION.format(
-            kind_name,
-            title,
-            year,
-            available_in,
-            language,
-            quality_text
-        )
+        caption = UPDATE_CAPTION.format(kind_name, title, year, available_in, language, quality_text)
 
         muc_id = await db.movies_update_channel_id() or MOVIE_UPDATE_CHANNEL
 
@@ -174,7 +168,7 @@ async def send_movie_update(bot, file_name, files):
             await bot.send_message(LOG_CHANNEL, f"❌ Cannot access MUC {muc_id}: {e}")
             return
 
-        print(f"📨 Sending update to MUC: {muc_id} | Movie: {title} ({year}) | Files: {len(files)}")
+        print(f"📨 Sending update to MUC: {muc_id} | Movie: {title} ({year}) | Files: {len(files)})")
 
         await bot.send_photo(
             chat_id=muc_id,
