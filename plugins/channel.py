@@ -1,10 +1,8 @@
 import re
 import asyncio
 import aiohttp
-
 from typing import Optional
 from collections import defaultdict
-
 from pyrogram import Client, filters, enums
 
 from info import *
@@ -39,7 +37,6 @@ UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
 <blockquote><b>〽️ Powered by @BSHEGDE5</b></blockquote>"""
 
 media_filter = filters.document | filters.video | filters.audio
-
 movie_files = defaultdict(list)
 POST_DELAY = 25
 processing_movies = set()
@@ -140,7 +137,6 @@ async def send_movie_update(bot, file_name, files):
         available_in = ", ".join(sorted(print_types)) or "HDRip"
 
         files.sort(key=lambda x: x.get("episode") or 0)
-
         quality_text = ""
 
         if is_series:
@@ -239,11 +235,22 @@ async def movie_name_format(file_name):
 
 
 async def get_qualities(text):
-    qualities = [
-        "480p", "400MB", "700MB", "720p", "720p HEVC", "1080p", "1080p HEVC", "2160p"
+    text_lower = text.lower()
+    patterns = [
+        (r"\b2160p\b", "2160p"),
+        (r"\b1080p\b", "1080p"),
+        (r"\b720p\b", "720p"),
+        (r"\b480p\b", "480p"),
+        (r"\b400mb\b", "400MB"),
+        (r"\b700mb\b", "700MB"),
+        (r"\b1080p\s*hevc\b", "1080p HEVC"),
+        (r"\b720p\s*hevc\b", "720p HEVC"),
     ]
-    found = [q for q in qualities if q.lower() in text.lower()]
-    return ", ".join(found) or "720p"
+    found = []
+    for pattern, label in patterns:
+        if re.search(pattern, text_lower):
+            found.append(label)
+    return ", ".join(found) if found else "720p"
 
 
 def detect_languages(text):
@@ -262,4 +269,3 @@ async def Jisshu_qualities(text, file_name):
 def extract_episode_number(text: str) -> Optional[int]:
     m = re.search(r"(?:EP|Ep|Episode)[\s\-_]?0*(\d{1,3})", text, re.IGNORECASE)
     return int(m.group(1)) if m else None
-    
