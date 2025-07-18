@@ -50,10 +50,10 @@ Aᴍᴏᴜɴᴛ:</b> {num_codes}
             [
                 [
                     InlineKeyboardButton(
-                        "♻️ Redeem Here ♻️", url="http://t.me/NehaTestBot"
+                        "♻️ Redeem Here ♻️", url="https://t.me/Bshegdetataplay_bot"
                     )
                 ],
-                [InlineKeyboardButton("❕ Any Query ❕", url="https://t.me/IM_JISSHU")],
+                [InlineKeyboardButton("❕ Any Query ❕", url="https://t.me/Shreeshiva323")],
             ]
         )
 
