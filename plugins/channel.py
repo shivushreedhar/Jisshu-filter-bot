@@ -25,9 +25,7 @@ LANGUAGE_KEYWORDS = {
 
 PRINT_TYPES = ["HDRip", "WEB-DL", "PreDVD", "HDCAM", "CAMRip", "DVDScr"]
 
-CAPTION_LANGUAGES = list(set(LANGUAGE_KEYWORDS.values()))
-
-UPDATE_CAPTION = """<b><blockquote>🎉 NEW {} STREAMING NOW 🎉</b></blockquote>
+UPDATE_CAPTION = """<b><blockquote>🎉 {} Streaming Now 🎉</b></blockquote>
 
 🎬 <b>Title : {} {}</b>
 🛠️ <b>Available in : {}</b>
@@ -144,15 +142,23 @@ async def send_movie_update(bot, file_name, files):
         files.sort(key=lambda x: x.get("episode") or 0)
 
         quality_text = ""
-        for file in files:
-            q = file.get("jisshuquality") or "Unknown"
-            size = file["file_size"]
-            file_id = file["file_id"]
-            ep = file.get("episode")
 
-            if is_series and ep:
-                quality_text += f"✴️ Episode {ep} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
-            else:
+        if is_series:
+            episode_map = defaultdict(list)
+            for file in files:
+                ep = file.get("episode") or 0
+                q = file.get("jisshuquality") or "Unknown"
+                episode_map[ep].append(q)
+
+            for ep in sorted(episode_map.keys()):
+                qualities = " | ".join(sorted(set(episode_map[ep])))
+                quality_text += f"✴️ Episode {ep} : {qualities}\n"
+
+        else:
+            for file in files:
+                q = file.get("jisshuquality") or "Unknown"
+                size = file["file_size"]
+                file_id = file["file_id"]
                 quality_text += f"✴️ {q} : <a href='https://t.me/{temp.U_NAME}?start=file_0_{file_id}'>{size}</a>\n"
 
         kind_name = "SERIES" if is_series else "MOVIE"
