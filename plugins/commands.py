@@ -76,7 +76,6 @@ async def maintenance_toggle(client: Client, message):
         await message.reply_text("✅ Maintenance mode is now OFF. Bot commands are enabled.")
     else:
         await message.reply_text("❌ Invalid argument. Use 'on' or 'off'.")
-port *
 
 logger = logging.getLogger(__name__)
 movie_series_db = JsTopDB(DATABASE_URI)
@@ -1582,6 +1581,7 @@ async def reset_group_command(client, message):
     reply_markup = InlineKeyboardMarkup(btn)
     await save_default_settings(grp_id)
     await message.reply_text("ꜱᴜᴄᴄᴇꜱꜱғᴜʟʟʏ ʀᴇꜱᴇᴛ ɢʀᴏᴜᴘ ꜱᴇᴛᴛɪɴɢꜱ...")
+
 
 
 
