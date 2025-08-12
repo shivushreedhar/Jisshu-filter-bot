@@ -48,6 +48,44 @@ movie_series_db = JsTopDB(DATABASE_URI)
 verification_ids = {}
 
 
+# --- Maintenance mode feature snippet ---
+
+MAINTENANCE_MODE = False  # Maintenance mode off by default
+OWNER_ID = 5536032493     # Replace with your Telegram user ID
+
+from pyrogram import enums
+
+def maintenance_check(func):
+    async def wrapper(client, message):
+        global MAINTENANCE_MODE
+        allowed_cmds = ["start", "help"]  # commands allowed during maintenance
+        if MAINTENANCE_MODE and message.command and message.command[0].lower() not in allowed_cmds:
+            await message.reply_text(
+                "⚠️ Bot is under maintenance. Please try again later.",
+                parse_mode=enums.ParseMode.HTML,
+            )
+            return
+        await func(client, message)
+    return wrapper
+
+@Client.on_message(filters.command("maintenance") & filters.user(OWNER_ID))
+async def maintenance_toggle(client: Client, message):
+    global MAINTENANCE_MODE
+    if len(message.command) < 2:
+        await message.reply_text("Usage: /maintenance [on|off]\nExample: /maintenance on")
+        return
+    arg = message.command[1].lower()
+    if arg == "on":
+        MAINTENANCE_MODE = True
+        await message.reply_text("✅ Maintenance mode is now ON. Bot commands are disabled.")
+    elif arg == "off":
+        MAINTENANCE_MODE = False
+        await message.reply_text("✅ Maintenance mode is now OFF. Bot commands are enabled.")
+    else:
+        await message.reply_text("❌ Invalid argument. Use 'on' or 'off'.")
+
+# --- End of maintenance snippet ---
+
 @Client.on_message(filters.command("start") & filters.incoming)
 async def start(client: Client, message):
     await message.react(emoji=random.choice(REACTIONS))
@@ -1547,3 +1585,4 @@ async def reset_group_command(client, message):
     reply_markup = InlineKeyboardMarkup(btn)
     await save_default_settings(grp_id)
     await message.reply_text("ꜱᴜᴄᴄᴇꜱꜱғᴜʟʟʏ ʀᴇꜱᴇᴛ ɢʀᴏᴜᴘ ꜱᴇᴛᴛɪɴɢꜱ...")
+
