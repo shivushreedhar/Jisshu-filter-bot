@@ -42,7 +42,6 @@ from utils import (
 import re
 import base64
 
-from info imfrom pyrogram import Client, filters, enums
 
 MAINTENANCE_MODE = False  # Maintenance off by default
 OWNER_ID = 5536032493     # Your Telegram user ID
@@ -1583,5 +1582,6 @@ async def reset_group_command(client, message):
     reply_markup = InlineKeyboardMarkup(btn)
     await save_default_settings(grp_id)
     await message.reply_text("ꜱᴜᴄᴄᴇꜱꜱғᴜʟʟʏ ʀᴇꜱᴇᴛ ɢʀᴏᴜᴘ ꜱᴇᴛᴛɪɴɢꜱ...")
+
 
 
