@@ -41,33 +41,27 @@ from utils import (
 )
 import re
 import base64
-from info import *
 
-logger = logging.getLogger(__name__)
-movie_series_db = JsTopDB(DATABASE_URI)
-verification_ids = {}
+from info imfrom pyrogram import Client, filters, enums
 
+MAINTENANCE_MODE = False  # Maintenance off by default
+OWNER_ID = 5536032493     # Your Telegram user ID
 
-# --- Maintenance mode feature snippet ---
-
-MAINTENANCE_MODE = False  # Maintenance mode off by default
-OWNER_ID = 5536032493     # Replace with your Telegram user ID
-
-from pyrogram import enums
-
-def maintenance_check(func):
-    async def wrapper(client, message):
-        global MAINTENANCE_MODE
+# Global maintenance command blocker
+@Client.on_message(filters.command & ~filters.user(OWNER_ID))
+async def block_all_commands_if_maintenance(client, message):
+    global MAINTENANCE_MODE
+    if MAINTENANCE_MODE:
         allowed_cmds = ["start", "help"]  # commands allowed during maintenance
-        if MAINTENANCE_MODE and message.command and message.command[0].lower() not in allowed_cmds:
+        cmd = message.command[0].lower() if message.command else ""
+        if cmd not in allowed_cmds:
             await message.reply_text(
                 "⚠️ Bot is under maintenance. Please try again later.",
                 parse_mode=enums.ParseMode.HTML,
             )
             return
-        await func(client, message)
-    return wrapper
 
+# Maintenance mode toggle command - ONLY OWNER can use
 @Client.on_message(filters.command("maintenance") & filters.user(OWNER_ID))
 async def maintenance_toggle(client: Client, message):
     global MAINTENANCE_MODE
@@ -83,8 +77,12 @@ async def maintenance_toggle(client: Client, message):
         await message.reply_text("✅ Maintenance mode is now OFF. Bot commands are enabled.")
     else:
         await message.reply_text("❌ Invalid argument. Use 'on' or 'off'.")
+port *
 
-# --- End of maintenance snippet ---
+logger = logging.getLogger(__name__)
+movie_series_db = JsTopDB(DATABASE_URI)
+verification_ids = {}
+
 
 @Client.on_message(filters.command("start") & filters.incoming)
 async def start(client: Client, message):
@@ -1585,4 +1583,5 @@ async def reset_group_command(client, message):
     reply_markup = InlineKeyboardMarkup(btn)
     await save_default_settings(grp_id)
     await message.reply_text("ꜱᴜᴄᴄᴇꜱꜱғᴜʟʟʏ ʀᴇꜱᴇᴛ ɢʀᴏᴜᴘ ꜱᴇᴛᴛɪɴɢꜱ...")
+
 
