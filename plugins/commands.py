@@ -304,7 +304,7 @@ async def start(client: Client, message):
         if not await is_req_subscribed(client, message):
             try:
                 invite_link_default = await client.create_chat_invite_link(int(AUTH_CHANNEL), creates_join_request=True)
-                btn.append([InlineKeyboardButton("⛔️ ᴊᴏɴ ɴᴏᴡ ⛔️", url=invite_link_default.invite_link)])
+                btn.append([InlineKeyboardButton("⛔️ ᴊᴏɪɴ ɴᴏᴡ ⛔️", url=invite_link_default.invite_link)])
             except Exception:
                 pass
         if message.command[1] != "subscribe" and (await is_req_subscribed(client, message) is False or await is_subscribed(client, message.from_user.id, channel) is False):
